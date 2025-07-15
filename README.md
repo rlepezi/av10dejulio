@@ -1,4 +1,8 @@
-# Getting Started with Create React App
+# AV10dejulio - Frontend
+
+Este proyecto contiene el frontend de la aplicación AV10dejulio, desarrollado con React.
+
+## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
