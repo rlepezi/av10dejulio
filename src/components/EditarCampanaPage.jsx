@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
-import { doc, getDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, onSnapshot, query, where } from "firebase/firestore";
 import { useNavigate, useParams } from "react-router-dom";
+
+// Para previsualización: si es URL usarla, si es nombre de archivo, usar /images/[NOMBRE]
+function getImagePath(value) {
+  if (!value) return "";
+  if (value.startsWith("http")) return value;
+  return `/images/${value}`;
+}
 
 export default function EditarCampanaPage() {
   const { id } = useParams();
   const [form, setForm] = useState(null);
   const [categoriasOptions, setCategoriasOptions] = useState([]);
   const [marcasOptions, setMarcasOptions] = useState([]);
+  const [proveedoresOptions, setProveedoresOptions] = useState([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -16,7 +24,12 @@ export default function EditarCampanaPage() {
   useEffect(() => {
     async function fetchCampana() {
       const snap = await getDoc(doc(db, "campanas", id));
-      setForm({ ...snap.data(), categorias: snap.data().categorias || [], marcas: snap.data().marcas || [] });
+      setForm({
+        ...snap.data(),
+        categorias: snap.data().categorias || [],
+        marcas: snap.data().marcas || [],
+        uidproveedor: snap.data().uidproveedor || "",
+      });
       setLoading(false);
     }
     fetchCampana();
@@ -33,9 +46,22 @@ export default function EditarCampanaPage() {
         doc.data().nombre || doc.id
       ));
     });
+    // Listado de proveedores activos desde empresas
+    const q = query(collection(db, "empresas"), where("estado", "==", "Activa"));
+    const unsubProveedores = onSnapshot(q, snap => {
+      setProveedoresOptions(
+        snap.docs.map(doc => ({
+          id: doc.id,
+          nombre: doc.data().nombre ?? doc.id,
+          email: doc.data().email ?? "",
+          logo: doc.data().logo ?? "",
+        }))
+      );
+    });
     return () => {
       unsubCategorias();
       unsubMarcas();
+      unsubProveedores();
     };
   }, []);
 
@@ -56,6 +82,17 @@ export default function EditarCampanaPage() {
     setForm(f => ({ ...f, estado: e.target.value }));
   }
 
+  // Cuando selecciona un proveedor, actualiza logoURL según el campo logo de la empresa
+  function handleProveedorChange(e) {
+    const selectedId = e.target.value;
+    const proveedor = proveedoresOptions.find(p => p.id === selectedId);
+    setForm(f => ({
+      ...f,
+      uidproveedor: selectedId,
+      logoURL: proveedor && proveedor.logo ? proveedor.logo : f.logoURL
+    }));
+  }
+
   async function handleUpdate(e) {
     e.preventDefault();
     setSaving(true);
@@ -70,6 +107,33 @@ export default function EditarCampanaPage() {
     <div className="p-4 max-w-2xl mx-auto">
       <h2 className="text-xl font-bold mb-4">Editar Campaña</h2>
       {msg && <div className="text-green-600 mb-2">{msg}</div>}
+      {/* Previsualización */}
+      <div className="flex gap-6 mb-6 items-center">
+        <div>
+          <div className="font-semibold mb-1 text-sm">Previsualización imagen</div>
+          {form.imagenURL ? (
+            <img
+              src={getImagePath(form.imagenURL)}
+              alt="Previsualización Imagen"
+              className="w-40 h-24 object-contain border rounded bg-white"
+            />
+          ) : (
+            <div className="w-40 h-24 flex items-center justify-center bg-gray-100 text-gray-400 border rounded">Sin imagen</div>
+          )}
+        </div>
+        <div>
+          <div className="font-semibold mb-1 text-sm">Previsualización logo</div>
+          {form.logoURL ? (
+            <img
+              src={getImagePath(form.logoURL)}
+              alt="Previsualización Logo"
+              className="w-16 h-16 object-contain border rounded bg-white"
+            />
+          ) : (
+            <div className="w-16 h-16 flex items-center justify-center bg-gray-100 text-gray-400 border rounded">Sin logo</div>
+          )}
+        </div>
+      </div>
       <form onSubmit={handleUpdate} className="space-y-4 bg-white p-4 rounded shadow">
         <div>
           <label className="block mb-1 font-semibold">Título *</label>
@@ -79,13 +143,44 @@ export default function EditarCampanaPage() {
           <label className="block mb-1 font-semibold">Descripción *</label>
           <textarea className="w-full border px-2 py-1 rounded" name="descripcion" value={form.descripcion || ""} onChange={handleChange} required />
         </div>
+        {/* Logo: sólo input texto, se previsualiza arriba */}
         <div>
-          <label className="block mb-1 font-semibold">Logo (URL)</label>
-          <input className="w-full border px-2 py-1 rounded" name="logoURL" value={form.logoURL || ""} onChange={handleChange} />
+          <label className="block mb-1 font-semibold">Logo (nombre archivo o URL)</label>
+          <input
+            className="w-full border px-2 py-1 rounded"
+            name="logoURL"
+            value={form.logoURL || ""}
+            onChange={handleChange}
+            placeholder="Ej: logo1.png o https://..."
+          />
         </div>
+        {/* Imagen: sólo input texto, se previsualiza arriba */}
         <div>
-          <label className="block mb-1 font-semibold">Imagen (URL)</label>
-          <input className="w-full border px-2 py-1 rounded" name="imagenURL" value={form.imagenURL || ""} onChange={handleChange} />
+          <label className="block mb-1 font-semibold">Imagen (nombre archivo o URL)</label>
+          <input
+            className="w-full border px-2 py-1 rounded"
+            name="imagenURL"
+            value={form.imagenURL || ""}
+            onChange={handleChange}
+            placeholder="Ej: banner1.png o https://..."
+          />
+        </div>
+        {/* Proveedor opcional */}
+        <div>
+          <label className="block mb-1 font-semibold">Proveedor asociado (opcional)</label>
+          <select
+            className="w-full border px-2 py-1 rounded"
+            name="uidproveedor"
+            value={form.uidproveedor || ""}
+            onChange={handleProveedorChange}
+          >
+            <option value="">Sin proveedor asignado</option>
+            {proveedoresOptions.map(prov => (
+              <option key={prov.id} value={prov.id}>
+                {prov.nombre} {prov.email && `(${prov.email})`}
+              </option>
+            ))}
+          </select>
         </div>
         {/* Categorías como tags/botón */}
         <div>
@@ -165,8 +260,9 @@ export default function EditarCampanaPage() {
           <label className="block mb-1 font-semibold">Link</label>
           <input className="w-full border px-2 py-1 rounded" name="link" value={form.link || ""} onChange={handleChange} />
         </div>
+        {/* Email proveedor, ahora OPCIONAL */}
         <div>
-          <label className="block mb-1 font-semibold">Email proveedor</label>
+          <label className="block mb-1 font-semibold">Email proveedor (opcional)</label>
           <input className="w-full border px-2 py-1 rounded" name="email" type="email" value={form.email || ""} onChange={handleChange} />
         </div>
         {/* Estado de campaña */}

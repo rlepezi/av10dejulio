@@ -3,6 +3,13 @@ import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
+// Utilidad para mostrar la ruta correcta de la imagen
+function getImagePath(value) {
+  if (!value) return "";
+  if (value.startsWith("http")) return value;
+  return `/images/${value}`;
+}
+
 // Función para asignar colores según estado
 function colorEstado(estado) {
   if (!estado) return "bg-gray-200 text-gray-700";
@@ -46,6 +53,7 @@ export default function ListadoProductosAdmin() {
       <table className="min-w-full border">
         <thead>
           <tr>
+            <th className="border px-2 py-1">Imagen</th>
             <th className="border px-2 py-1">Título</th>
             <th className="border px-2 py-1">Categoría</th>
             <th className="border px-2 py-1">Precio</th>
@@ -56,6 +64,17 @@ export default function ListadoProductosAdmin() {
         <tbody>
           {productos.map((p) => (
             <tr key={p.id}>
+              <td className="border px-2 py-1 text-center">
+                {p.imagenURL ? (
+                  <img
+                    src={getImagePath(p.imagenURL)}
+                    alt="Imagen"
+                    className="w-16 h-12 object-contain mx-auto border rounded bg-white"
+                  />
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+              </td>
               <td className="border px-2 py-1">{p.titulo ?? "-"}</td>
               <td className="border px-2 py-1">
                 {Array.isArray(p.categorias) ? p.categorias.join(", ") : p.categoria ?? "-"}

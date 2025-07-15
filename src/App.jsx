@@ -65,6 +65,61 @@ function BotonVolver({ setEmpresaAEditar, setCampanaAEditar, setView, setIdCampa
   );
 }
 
+// Banner superior destacado
+function BannerSuperior() {
+  return (
+    <div className="w-full bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-500 py-3 px-6 flex flex-col md:flex-row items-center justify-center gap-3 text-white font-bold text-center text-base shadow-lg">
+      <span className="flex items-center gap-2">
+        🚗 <span className="hidden sm:inline">Más de</span> <span className="text-2xl sm:text-3xl font-extrabold drop-shadow">200+</span> PROVEEDORES del sector Av. 10 de Julio
+      </span>
+      <span className="mx-2 hidden md:inline-block">|</span>
+      <span>
+        <span className="hidden sm:inline">¡</span>
+        <span className="underline decoration-2 underline-offset-2">Envíanos tu solicitud</span> para incorporarte y accede a <span className="text-yellow-100 font-extrabold">beneficios sin costo</span>
+        <span className="hidden sm:inline">!</span>
+      </span>
+    </div>
+  );
+}
+
+// Nuevo ListadoMarcas SOLO logos y tooltip
+function ListadoMarcasLogos({ onSelectMarca }) {
+  const [marcas, setMarcas] = useState([]);
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "marcas"), snap => {
+      setMarcas(snap.docs.map(doc => doc.data().nombre));
+    });
+    return () => unsub();
+  }, []);
+  return (
+    <div className="flex flex-wrap gap-2 justify-center py-2">
+      {marcas.map(marca => {
+        const iconSrc = `/logos/${marca.toLowerCase().replace(/\s+/g, "")}.png`;
+        return (
+          <button
+            key={marca}
+            className="group relative focus:outline-none"
+            onClick={() => onSelectMarca(marca)}
+            aria-label={marca}
+          >
+            <img
+              src={iconSrc}
+              alt={marca}
+              className="w-12 h-12 rounded-full bg-white object-contain border border-gray-200 shadow-md hover:scale-110 transition"
+              loading="lazy"
+              onError={e => (e.target.style.display = "none")}
+            />
+            {/* Tooltip */}
+            <span className="opacity-0 group-hover:opacity-100 pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 bg-gray-900 text-white text-xs rounded px-2 py-1 z-10 whitespace-nowrap shadow transition-opacity">
+              {marca}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   // Estados para el home clásico
   const [view, setView] = useState(""); // "" = principal
@@ -208,6 +263,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <BannerSuperior />
         <HeaderMenu />
         <Routes>
           {/* Login y postulación */}
@@ -237,9 +293,7 @@ export default function App() {
           <Route path="/admin/nuevo-producto" element={<ProtectedRoute rol="admin"><FormNuevoProducto /></ProtectedRoute>} />
           <Route path="/admin/marcas/nueva-marca" element={<ProtectedRoute rol="admin"><FormNuevaMarca/></ProtectedRoute>} />
           <Route path="/admin/categorias/nueva-categoria" element={<ProtectedRoute rol="admin"><FormNuevaCategoria /></ProtectedRoute>} />
-          
           <Route path="/admin/solicitudes-productos" element={<ProtectedRoute rol="admin"><ListadoSolicitudesProductos /></ProtectedRoute>} />
-         
 
           {/* Panel Proveedor */}
           <Route path="/proveedores/mas-informacion" element={<MasInformacionProveedorPage />} />
@@ -257,45 +311,46 @@ export default function App() {
                   busqueda={busqueda}
                   setBusqueda={setBusqueda}
                 />
-                <ListadoMarcas onSelectMarca={setMarcaSeleccionada} />
+                {/* Marcas SOLO logos y tooltip */}
+                <ListadoMarcasLogos onSelectMarca={setMarcaSeleccionada} />
                 <div className="my-6"></div>
                 {categoriasDisponibles.length > 0 && (
-  <div className="mb-4 flex flex-wrap gap-2">
-    <span className="text-green-700 font-medium">Filtrar por categoría:</span>
-    {categoriasDisponibles.map(cat => {
-      // Normaliza el nombre: minúsculas y sin espacios para el nombre del archivo
-      const iconSrc = `/logos/${cat.toLowerCase().replace(/\s+/g, "")}.png`;
-      return (
-        <button
-          key={cat}
-          className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1 ${
-            categoriaSeleccionada === cat
-              ? "bg-green-600 text-white"
-              : "bg-green-100 text-green-800"
-          }`}
-          onClick={() => setCategoriaSeleccionada(cat)}
-        >
-          <img
-            src={iconSrc}
-            alt={cat}
-            className="w-5 h-5 rounded-full bg-white object-contain border border-gray-200 mr-1"
-            loading="lazy"
-            onError={e => (e.target.style.display = "none")}
-          />
-          {cat}
-        </button>
-      );
-    })}
-    {categoriaSeleccionada && (
-      <button
-        onClick={() => setCategoriaSeleccionada(null)}
-        className="px-2 py-1 rounded bg-gray-300 text-xs text-gray-900 ml-2"
-      >
-        Limpiar filtro
-      </button>
-    )}
-  </div>
-)}
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <span className="text-green-700 font-medium">Filtrar por categoría:</span>
+                    {categoriasDisponibles.map(cat => {
+                      // Normaliza el nombre: minúsculas y sin espacios para el nombre del archivo
+                      const iconSrc = `/logos/${cat.toLowerCase().replace(/\s+/g, "")}.png`;
+                      return (
+                        <button
+                          key={cat}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1 ${
+                            categoriaSeleccionada === cat
+                              ? "bg-green-600 text-white"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                          onClick={() => setCategoriaSeleccionada(cat)}
+                        >
+                          <img
+                            src={iconSrc}
+                            alt={cat}
+                            className="w-5 h-5 rounded-full bg-white object-contain border border-gray-200 mr-1"
+                            loading="lazy"
+                            onError={e => (e.target.style.display = "none")}
+                          />
+                          {cat}
+                        </button>
+                      );
+                    })}
+                    {categoriaSeleccionada && (
+                      <button
+                        onClick={() => setCategoriaSeleccionada(null)}
+                        className="px-2 py-1 rounded bg-gray-300 text-xs text-gray-900 ml-2"
+                      >
+                        Limpiar filtro
+                      </button>
+                    )}
+                  </div>
+                )}
                 <ListadoCampanas 
                   filtroMarca={marcaSeleccionada} 
                   filtroBusqueda={busqueda}

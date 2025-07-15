@@ -3,6 +3,13 @@ import { db } from "../firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { Link } from "react-router-dom";
 
+// Función para obtener la ruta de imagen/logo
+function getImagePath(value) {
+  if (!value) return "";
+  if (value.startsWith("http")) return value;
+  return `/images/${value}`;
+}
+
 function colorEstado(estado) {
   if (!estado) return "bg-gray-200 text-gray-700";
   switch (estado.toLowerCase()) {
@@ -75,6 +82,7 @@ export default function EmpresasTable() {
           <thead>
             <tr>
               <th className="border-b p-2">#</th>
+              <th className="border-b p-2">Logo</th>
               <th className="border-b p-2">Nombre</th>
               <th className="border-b p-2">Mail</th>
               <th className="border-b p-2">Web</th>
@@ -86,22 +94,33 @@ export default function EmpresasTable() {
             {empresasFiltradas.map((emp, idx) => (
               <tr key={emp.id} className="hover:bg-blue-50">
                 <td className="p-2 text-center">{idx + 1}</td>
+                <td className="p-2 text-center">
+                  {emp.logo ? (
+                    <img
+                      src={getImagePath(emp.logo)}
+                      alt="Logo"
+                      className="w-12 h-12 object-contain mx-auto border rounded bg-white"
+                    />
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
                 <td className="p-2">{emp.nombre}</td>
                 <td className="p-2">{emp.email}</td>
                 <td className="p-2">
-  {emp.web ? (
-    <a
-      href={emp.web.startsWith("http") ? emp.web : `https://${emp.web}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-700 underline"
-    >
-      {emp.web}
-    </a>
-  ) : (
-    "-"
-  )}
-</td>
+                  {emp.web ? (
+                    <a
+                      href={emp.web.startsWith("http") ? emp.web : `https://${emp.web}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-700 underline"
+                    >
+                      {emp.web}
+                    </a>
+                  ) : (
+                    "-"
+                  )}
+                </td>
                 <td className="p-2">
                   <span className={`px-2 py-1 rounded text-xs font-semibold ${colorEstado(emp.estado)}`}>
                     {emp.estado || "-"}
@@ -114,7 +133,7 @@ export default function EmpresasTable() {
             ))}
             {empresasFiltradas.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center text-gray-500 py-4">No hay resultados.</td>
+                <td colSpan={7} className="text-center text-gray-500 py-4">No hay resultados.</td>
               </tr>
             )}
           </tbody>

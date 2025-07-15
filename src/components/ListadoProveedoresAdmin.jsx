@@ -3,6 +3,13 @@ import { db } from "../firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
+// Función para obtener ruta de imagen/logo
+function getImagePath(value) {
+  if (!value) return "";
+  if (value.startsWith("http")) return value;
+  return `/images/${value}`;
+}
+
 function colorEstado(estado) {
   if (!estado) return "bg-gray-200 text-gray-700";
   switch (estado.toLowerCase()) {
@@ -41,6 +48,7 @@ export default function ListadoProveedoresAdmin() {
         <thead>
           <tr>
             <th className="border px-2 py-1">#</th>
+            <th className="border px-2 py-1">Logo</th>
             <th className="border px-2 py-1">Nombre</th>
             <th className="border px-2 py-1">Email</th>
             <th className="border px-2 py-1">Web</th>
@@ -52,6 +60,17 @@ export default function ListadoProveedoresAdmin() {
           {proveedores.map((p, idx) => (
             <tr key={p.id}>
               <td className="border px-2 py-1 text-center">{idx + 1}</td>
+              <td className="border px-2 py-1 text-center">
+                {p.logo ? (
+                  <img
+                    src={getImagePath(p.logo)}
+                    alt="Logo"
+                    className="w-12 h-12 object-contain mx-auto border rounded bg-white"
+                  />
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+              </td>
               <td className="border px-2 py-1">{p.nombre ?? "-"}</td>
               <td className="border px-2 py-1">{p.email ?? "-"}</td>
               <td className="border px-2 py-1">

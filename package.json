@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.1",
+    "dayjs": "^1.11.13",
     "firebase": "^10.7.2",
+    "jspdf": "^3.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-firebase-hooks": "^5.1.1",

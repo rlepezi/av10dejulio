@@ -45,6 +45,25 @@ export default function DashboardProveedor() {
           </ol>
         </section>
 
+        {/* NUEVA SECCIÓN DE AYUDA PARA PAGINA WEB */}
+        <section className="mb-8 bg-blue-50 border border-blue-200 rounded p-4">
+          <h3 className="text-lg font-semibold text-blue-800 mb-1 flex items-center gap-2">
+            <span role="img" aria-label="laptop">💻</span>
+            ¿Aún no tienes página web para tu empresa?
+          </h3>
+          <p className="text-blue-800 mb-2">
+            Digital Bandurria SPA (<a href="https://dbandurria.cl" className="underline text-blue-700" target="_blank" rel="noopener noreferrer">dbandurria.cl</a>) puede ayudarte a crear tu página web profesional, atractiva y adaptada a tus necesidades. 
+          </p>
+          <ul className="list-disc pl-6 text-blue-700 mb-2 space-y-1">
+            <li>Asesoría personalizada para digitalizar tu empresa.</li>
+            <li>Creación y mantención de sitios web modernos.</li>
+            <li>Soluciones accesibles y soporte continuo.</li>
+          </ul>
+          <div className="text-sm text-blue-900 mt-2">
+            ¿Quieres más información? <a href="mailto:contacto@dbandurria.cl" className="underline text-green-700">Escríbenos</a> y te guiamos paso a paso.
+          </div>
+        </section>
+
         <section className="mb-8 text-center">
           <span className="block mb-2 text-lg text-blue-900 font-semibold">¿Aún no eres proveedor?</span>
           <button
@@ -56,7 +75,6 @@ export default function DashboardProveedor() {
         </section>
 
         <div className="flex flex-col gap-4 mt-6">
-          
           <button
             className="bg-blue-200 hover:bg-blue-300 text-blue-900 px-4 py-2 rounded font-semibold"
             onClick={() => navigate("/proveedores/mas-informacion")}
