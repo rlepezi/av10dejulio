@@ -25,6 +25,7 @@ import AdminSetup from "./AdminSetup";
 import ReviewModerationPage from "../pages/ReviewModerationPage";
 import TicketManagementPage from "../pages/TicketManagementPage";
 import ResourceManager from "./ResourceManager";
+import EditarEmpresaAdmin from "./EditarEmpresaAdmin";
 
 // Servicios
 import ServicioSeguros from "./ServicioSeguros";
@@ -49,6 +50,7 @@ export default function AdminLayout() {
         
         {/* Administración */}
         <Route path="empresas" element={<AdminStoreList />} />
+        <Route path="editar-empresa/:empresaId" element={<EditarEmpresaAdmin />} />
         <Route path="marcas" element={<AdminMarcas />} />
         <Route path="tipos-empresa" element={<GestionTiposEmpresa />} />
         <Route path="categorias" element={<ListadoCategoriasAdmin />} />

@@ -118,7 +118,14 @@ export default function EmpresasTable() {
                       {emp.web}
                     </a>
                   ) : (
-                    "-"
+                    <a
+                      href={`/perfil-empresa/${emp.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-700 underline"
+                    >
+                      Ver Perfil
+                    </a>
                   )}
                 </td>
                 <td className="p-2">
