@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
+import CampaignCard from "./CampaignCard";
 
 export default function ListadoCampanas({ filtroMarca, filtroBusqueda, onVerDetalle }) {
   const [campanas, setCampanas] = useState([]);
@@ -47,6 +48,12 @@ export default function ListadoCampanas({ filtroMarca, filtroBusqueda, onVerDeta
     );
   }
 
+  const handleViewDetail = (campaignId) => {
+    if (onVerDetalle) {
+      onVerDetalle(campaignId);
+    }
+  };
+
   if (campanasFiltradas.length === 0) {
     return (
       <div className="text-gray-500 text-sm px-4 mt-8">No hay campañas disponibles.</div>
@@ -55,51 +62,14 @@ export default function ListadoCampanas({ filtroMarca, filtroBusqueda, onVerDeta
 
   return (
     <div className="mt-8 px-4 w-full">
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {campanasFiltradas.map(camp => {
-          const imagen = camp.imagenURL || camp.imagenUrl || "";
-          const imagenSrc = imagen
-            ? imagen.startsWith("http") ? imagen : `/images/${imagen}`
-            : "";
-
-          // Logo circular
-          const logo = camp.logoURL || camp.logoUrl || "";
-          const logoSrc = logo
-            ? logo.startsWith("http") ? logo : `/images/${logo}`
-            : "";
-
-          return (
-            <div
-              key={camp.id}
-              className="bg-white rounded-lg shadow-lg p-0 border border-blue-100 cursor-pointer hover:shadow-xl transition"
-              onClick={() => onVerDetalle && onVerDetalle(camp.id)}
-              title="Ver detalle de campaña"
-            >
-              <div className="relative">
-                {imagenSrc ? (
-                  <img
-                    src={imagenSrc}
-                    alt={camp.titulo || "Campaña"}
-                    className="w-full h-56 object-cover rounded-t-lg"
-                  />
-                ) : (
-                  <div className="w-full h-56 flex items-center justify-center bg-gray-100 rounded-t-lg text-gray-400 text-4xl">
-                    Sin imagen
-                  </div>
-                )}
-                {logoSrc && (
-                  <img
-                    src={logoSrc}
-                    alt="Logo"
-                    className="absolute left-1/2 -bottom-8 transform -translate-x-1/2 w-16 h-16 object-cover rounded-full border-4 border-white shadow-md bg-white"
-                    style={{ zIndex: 2 }}
-                  />
-                )}
-              </div>
-              <div style={{ height: "2.5rem" }}></div> {/* Espacio para el logo */}
-            </div>
-          );
-        })}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {campanasFiltradas.map(campaign => (
+          <CampaignCard
+            key={campaign.id}
+            campaign={campaign}
+            onViewDetail={handleViewDetail}
+          />
+        ))}
       </div>
     </div>
   );

@@ -13,8 +13,15 @@ export default function DashboardSwitch() {
       navigate("/admin");
     } else if (rol === "proveedor") {
       navigate("/dashboard/proveedor");
+    } else if (rol === "agente") {
+      navigate("/dashboard/agente");
+    } else if (rol === "mecanico") {
+      navigate("/dashboard/mecanico");
+    } else if (rol === "cliente") {
+      navigate("/dashboard/cliente");
     } else {
-      navigate("/");
+      // Usuario sin rol específico, redirigir al dashboard general
+      navigate("/dashboard/cliente");
     }
   }, [user, rol, navigate]);
 

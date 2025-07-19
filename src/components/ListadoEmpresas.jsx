@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
+import ProviderCard from "./ProviderCard";
+import AdvancedFilters from "./AdvancedFilters";
 
 export default function ListadoEmpresas({
   filtroMarca,
@@ -10,6 +12,8 @@ export default function ListadoEmpresas({
   usuario
 }) {
   const [empresas, setEmpresas] = useState([]);
+  const [advancedFilters, setAdvancedFilters] = useState({});
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "empresas"), (snapshot) => {
@@ -45,122 +49,151 @@ export default function ListadoEmpresas({
     );
   }
 
+  // Aplicar filtros avanzados
+  if (advancedFilters.region) {
+    empresasFiltradas = empresasFiltradas.filter(emp => emp.region === advancedFilters.region);
+  }
+
+  if (advancedFilters.ciudad) {
+    empresasFiltradas = empresasFiltradas.filter(emp => emp.ciudad === advancedFilters.ciudad);
+  }
+
+  if (advancedFilters.tipoProveedor) {
+    switch (advancedFilters.tipoProveedor) {
+      case 'emprendimiento':
+        empresasFiltradas = empresasFiltradas.filter(emp => {
+          const fechaRegistro = emp.fechaRegistro || emp.fechaCreacion;
+          const esMuyNueva = fechaRegistro && 
+            (new Date() - (fechaRegistro.toDate ? fechaRegistro.toDate() : new Date(fechaRegistro))) < (6 * 30 * 24 * 60 * 60 * 1000);
+          return emp.esEmprendimiento || esMuyNueva || (emp.numeroProductos && emp.numeroProductos < 10);
+        });
+        break;
+      case 'pyme':
+        empresasFiltradas = empresasFiltradas.filter(emp => {
+          const fechaRegistro = emp.fechaRegistro || emp.fechaCreacion;
+          const esNueva = fechaRegistro && 
+            (new Date() - (fechaRegistro.toDate ? fechaRegistro.toDate() : new Date(fechaRegistro))) < (2 * 365 * 24 * 60 * 60 * 1000);
+          return emp.esPyme || esNueva || (emp.numeroProductos && emp.numeroProductos < 50);
+        });
+        break;
+      case 'local':
+        empresasFiltradas = empresasFiltradas.filter(emp => 
+          emp.esLocal || 
+          (emp.region && emp.region.toLowerCase().includes('metropolitana')) ||
+          (emp.ciudad && ['santiago', 'providencia', 'las condes', 'vitacura'].includes(emp.ciudad.toLowerCase()))
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (advancedFilters.verificado) {
+    switch (advancedFilters.verificado) {
+      case 'verificado':
+        empresasFiltradas = empresasFiltradas.filter(emp => emp.verificado);
+        break;
+      case 'premium':
+        empresasFiltradas = empresasFiltradas.filter(emp => emp.esPremium);
+        break;
+      case 'nuevo':
+        empresasFiltradas = empresasFiltradas.filter(emp => emp.esNuevo);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Filtros de características especiales
+  if (advancedFilters.esLocal) {
+    empresasFiltradas = empresasFiltradas.filter(emp => 
+      emp.esLocal || 
+      (emp.region && emp.region.toLowerCase().includes('metropolitana')) ||
+      (emp.ciudad && ['santiago', 'providencia', 'las condes', 'vitacura'].includes(emp.ciudad.toLowerCase()))
+    );
+  }
+
+  if (advancedFilters.esPyme) {
+    empresasFiltradas = empresasFiltradas.filter(emp => {
+      const fechaRegistro = emp.fechaRegistro || emp.fechaCreacion;
+      const esNueva = fechaRegistro && 
+        (new Date() - (fechaRegistro.toDate ? fechaRegistro.toDate() : new Date(fechaRegistro))) < (2 * 365 * 24 * 60 * 60 * 1000);
+      return emp.esPyme || esNueva || (emp.numeroProductos && emp.numeroProductos < 50);
+    });
+  }
+
+  if (advancedFilters.esEmprendimiento) {
+    empresasFiltradas = empresasFiltradas.filter(emp => {
+      const fechaRegistro = emp.fechaRegistro || emp.fechaCreacion;
+      const esMuyNueva = fechaRegistro && 
+        (new Date() - (fechaRegistro.toDate ? fechaRegistro.toDate() : new Date(fechaRegistro))) < (6 * 30 * 24 * 60 * 60 * 1000);
+      return emp.esEmprendimiento || esMuyNueva || (emp.numeroProductos && emp.numeroProductos < 10);
+    });
+  }
+
+  if (advancedFilters.esPremium) {
+    empresasFiltradas = empresasFiltradas.filter(emp => emp.esPremium);
+  }
+
   if (empresasFiltradas.length === 0)
     return <div className="text-gray-500 mb-6 text-center">No hay empresas para mostrar.</div>;
 
+  const handleViewDetail = (providerId) => {
+    // Implementar vista de detalles del proveedor
+    console.log('Ver detalles del proveedor:', providerId);
+  };
+
+  const handleViewLocation = (providerId) => {
+    // Implementar vista de ubicación del proveedor
+    console.log('Ver ubicación del proveedor:', providerId);
+  };
+
+  const transformProviderData = (empresa) => {
+    return {
+      ...empresa,
+      rating: empresa.calificacion || 4.2 + Math.random() * 0.8, // Rating simulado
+      reviewCount: empresa.numeroReseñas || Math.floor(Math.random() * 50) + 10,
+      responseTime: empresa.tiempoRespuesta || '< 2 horas',
+      isVerified: empresa.verificado || false,
+      isPremium: empresa.esPremium || false,
+      isLocal: empresa.esLocal || false,
+      isPyme: empresa.esPyme || false,
+      isEmprendimiento: empresa.esEmprendimiento || false,
+    };
+  };
+
   return (
-    <div className="bg-gradient-to-b from-white via-slate-50 to-slate-100 p-6 rounded-xl shadow-inner border border-gray-300 mt-6">
-      <div className="text-right text-xs text-gray-500 mb-4">
-        <h2 className="text-lg font-bold text-gray-800 mb-3 text-left">🏷️ Tiendas disponibles</h2>
-        Mostrando {empresasFiltradas.length} empresa{empresasFiltradas.length !== 1 && "s"}
+    <div>
+      {/* Filtros Avanzados */}
+      <div className="mb-6">
+        <AdvancedFilters
+          onFiltersChange={setAdvancedFilters}
+          showRegionFilter={true}
+          showTypeFilter={true}
+          showVerificationFilter={true}
+        />
       </div>
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-        {empresasFiltradas.map(emp => (
-          <div
-            key={emp.id}
-            className="relative bg-white rounded-xl shadow-xl hover:shadow-2xl border border-gray-200 transition-all p-0 flex flex-col overflow-hidden"
-          >
-            {/* Imagen principal tipo banner */}
-            <div className="relative w-full h-32 bg-gray-100 flex items-center justify-center">
-              {emp.imagen && (
-                <img
-                  src={`/images/${emp.imagen}`}
-                  alt={`Imagen de ${emp.nombre}`}
-                  className="w-full h-32 object-cover"
-                  style={{ objectPosition: 'center' }}
-                  loading="lazy"
-                  onError={e => (e.target.style.display = "none")}
-                />
-              )}
-              {/* Logo circular sobre el banner */}
-              {emp.logo && (
-                <img
-                  src={`/images/${emp.logo}`}
-                  alt={`Logo de ${emp.nombre}`}
-                  className="absolute left-5 top-20 w-16 h-16 rounded-full border-4 border-white shadow-lg bg-white object-contain"
-                  style={{ transform: "translateY(-50%)" }}
-                  loading="lazy"
-                  onError={e => (e.target.style.display = "none")}
-                />
-              )}
-              {/* Botón editar */}
-              {usuario && onEditar && (
-                <button
-                  className="absolute top-3 right-3 bg-blue-600 hover:bg-blue-800 text-white rounded-full p-1 shadow"
-                  onClick={() => onEditar(emp)}
-                  title="Editar empresa"
-                >
-                  ✏️
-                </button>
-              )}
-            </div>
-            <div className="pt-8 px-6 pb-6">
-              {/* Nombre de la empresa */}
-              {emp.web ? (
-                <a
-                  href={emp.web.startsWith('http') ? emp.web : `https://${emp.web}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold text-lg text-blue-800 hover:underline"
-                  title={emp.web}
-                >
-                  {emp.nombre}
-                </a>
-              ) : (
-                <h3 className="font-bold text-lg text-blue-800">{emp.nombre}</h3>
-              )}
-              <p className="text-sm text-gray-600 italic flex items-center gap-1 mt-1">
-                <span>📍</span> {emp.direccion}
-              </p>
-              {/* Mapa de la dirección */}
-              {emp.direccion && (
-                <iframe
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(emp.direccion)}&output=embed`}
-                  width="100%"
-                  height="100"
-                  style={{ border: 0, borderRadius: "8px" }}
-                  allowFullScreen=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title={`Mapa de ${emp.nombre}`}
-                  className="mb-2 mt-2"
-                />
-              )}
-              {/* Marcas */}
-              {emp.marcas?.length > 0 && (
-                <div className="mt-2">
-                  <p className="font-semibold text-fuchsia-700 mb-1">Marcas:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {emp.marcas.map((marca, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs font-semibold"
-                      >
-                        {marca}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Categorías */}
-              {emp.categorias?.length > 0 && (
-                <div className="mt-2">
-                  <p className="font-semibold text-green-700 mb-1">Categorías:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {emp.categorias.map((cat, idx) => (
-                      <span
-                        key={idx}
-                        className="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full shadow-sm"
-                      >
-                        {cat}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+
+      <div className="bg-gradient-to-b from-white via-slate-50 to-slate-100 p-6 rounded-xl shadow-inner border border-gray-300 mt-6">
+        <div className="text-right text-xs text-gray-500 mb-4">
+          <h2 className="text-lg font-bold text-gray-800 mb-3 text-left">🏷️ Tiendas disponibles</h2>
+          Mostrando {empresasFiltradas.length} empresa{empresasFiltradas.length !== 1 && "s"}
+        </div>
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {empresasFiltradas.map(empresa => {
+            const transformedProvider = transformProviderData(empresa);
+            
+            return (
+              <ProviderCard
+                key={empresa.id}
+                provider={transformedProvider}
+                onViewDetail={handleViewDetail}
+                onViewLocation={handleViewLocation}
+                showDetailedInfo={true}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
