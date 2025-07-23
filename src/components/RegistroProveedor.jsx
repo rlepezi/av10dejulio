@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { NotificationService } from '../utils/notificationService';
 import { getRegiones, getComunas } from '../utils/regionesComunas';
 
 // Componente para registro sin autenticación
 function RegistroProveedorSinAuth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     // Información de la Empresa
@@ -21,6 +22,10 @@ function RegistroProveedorSinAuth() {
     telefono_empresa: '',
     email_empresa: '',
     web_actual: '',
+    
+    // Clasificación de empresa
+    rubro: '',
+    tipoEmpresa: '', // Se determinará según la ruta
     
     // Información del Representante
     nombres_representante: '',
@@ -66,6 +71,57 @@ function RegistroProveedorSinAuth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [solicitudEnviada, setSolicitudEnviada] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(5);
+
+  // Opciones de rubro para PyMEs
+  const rubrosDisponibles = [
+    'Vulcanización',
+    'Lavado',
+    'Talleres mecánicos',
+    'Pintura',
+    'Lubricentro',
+    'Accesorios',
+    'Grúas',
+    'Repuestos',
+    'Neumáticos',
+    'Baterías',
+    'Frenos',
+    'Eléctrico',
+    'Carrocería',
+    'Escapes',
+    'Filtros',
+    'Herramientas',
+    'Diagnóstico',
+    'Mantención',
+    'Seguros',
+    'Audio y Alarmas',
+    'Climatización',
+    'Transmisión',
+    'Suspensión',
+    'Otros'
+  ];
+
+  // Determinar tipo de empresa según la ruta
+  useEffect(() => {
+    const pathname = location.pathname;
+    let tipoDetectado = '';
+    
+    if (pathname.includes('pyme') || pathname.includes('emprendimiento')) {
+      tipoDetectado = 'pyme';
+    } else if (pathname.includes('proveedor')) {
+      tipoDetectado = 'proveedor';
+    } else if (pathname.includes('proveedores-locales')) {
+      // Si viene de la página de PyMEs locales, es PyME
+      tipoDetectado = 'pyme';
+    } else {
+      // Por defecto, si viene de /registro-proveedor, es proveedor
+      tipoDetectado = 'proveedor';
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      tipoEmpresa: tipoDetectado
+    }));
+  }, [location.pathname]);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -217,6 +273,7 @@ function RegistroProveedorSinAuth() {
       if (!formData.direccion_empresa.trim()) newErrors.direccion_empresa = 'La dirección es obligatoria';
       if (!formData.telefono_empresa.trim()) newErrors.telefono_empresa = 'El teléfono es obligatorio';
       if (!formData.email_empresa.trim()) newErrors.email_empresa = 'El email de la empresa es obligatorio';
+      if (!formData.rubro.trim()) newErrors.rubro = 'El rubro específico es obligatorio';
       if (formData.email_empresa && !/\S+@\S+\.\S+/.test(formData.email_empresa)) {
         newErrors.email_empresa = 'El email no es válido';
       }
@@ -274,7 +331,7 @@ function RegistroProveedorSinAuth() {
     try {
       // Verificar si el email ya existe
       const emailQuery = query(
-        collection(db, 'solicitudes_proveedor'),
+        collection(db, 'solicitudes_empresa'),
         where('email_empresa', '==', formData.email_empresa)
       );
       const emailSnapshot = await getDocs(emailQuery);
@@ -294,7 +351,7 @@ function RegistroProveedorSinAuth() {
         fecha_solicitud: new Date(),
         
         // Estados de la solicitud
-        estado_general: 'enviada', // enviada, en_revision, validacion_documentos, visita_programada, aprobada, rechazada
+        estado: 'pendiente', // pendiente, en_revision, validacion_documentos, visita_programada, aprobada, rechazada
         etapa_actual: 'revision_inicial',
         progreso_porcentaje: 15,
         
@@ -368,7 +425,7 @@ function RegistroProveedorSinAuth() {
         password_hash: btoa(password) // Base64 simple, en producción usar hash seguro
       };
 
-      const docRef = await addDoc(collection(db, 'solicitudes_proveedor'), solicitudData);
+      const docRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudData);
       
       // Enviar notificación al admin
       await NotificationService.createInAppNotification(
@@ -612,6 +669,72 @@ function RegistroProveedorSinAuth() {
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Si no tienes página web, ¡no te preocupes! Te ayudamos a crear una en los siguientes pasos.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rubro Específico *</label>
+                <select
+                  name="rubro"
+                  value={formData.rubro}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.rubro ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Selecciona tu rubro específico</option>
+                  {rubrosDisponibles.map(rubro => (
+                    <option key={rubro} value={rubro}>{rubro}</option>
+                  ))}
+                </select>
+                {errors.rubro && <p className="text-red-500 text-sm mt-1">{errors.rubro}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Empresa</label>
+                <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="tipoEmpresa"
+                      value="proveedor"
+                      checked={formData.tipoEmpresa === 'proveedor'}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label className="ml-2 text-sm font-medium text-gray-700">
+                      Proveedor
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="tipoEmpresa"
+                      value="pyme"
+                      checked={formData.tipoEmpresa === 'pyme'}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label className="ml-2 text-sm font-medium text-gray-700">
+                      PyME
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="tipoEmpresa"
+                      value="emprendimiento"
+                      checked={formData.tipoEmpresa === 'emprendimiento'}
+                      onChange={handleInputChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label className="ml-2 text-sm font-medium text-gray-700">
+                      Emprendimiento
+                    </label>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  Este campo se preselecciona según la forma en que accediste al formulario.
                 </p>
               </div>
             </div>
@@ -1135,7 +1258,7 @@ function RegistroProveedorSinAuth() {
                 disabled={isSubmitting}
                 className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
               >
-                {isSubmitting ? 'Enviando Solicitud...' : '🏪 Enviar Solicitud de Proveedor'}
+                {isSubmitting ? 'Enviando Solicitud...' : '🏪 Enviar Solicitud'}
               </button>
             )}
           </div>
@@ -1175,7 +1298,7 @@ export default function RegistroProveedor() {
 
         // Verificar solicitud pendiente
         const solicitudQuery = query(
-          collection(db, 'solicitudes_proveedor'),
+          collection(db, 'solicitudes_empresa'),
           where('email_empresa', '==', user.email)
         );
         const solicitudSnapshot = await getDocs(solicitudQuery);
@@ -1230,7 +1353,7 @@ export default function RegistroProveedor() {
               Te contactaremos pronto con el estado de tu solicitud.
             </p>
             <div className="space-y-2 text-sm text-gray-500">
-              <p>Estado: <span className="font-medium">{perfilProveedor.estado_general}</span></p>
+              <p>Estado: <span className="font-medium">{perfilProveedor.estado}</span></p>
               <p>Etapa: <span className="font-medium">{perfilProveedor.etapa_actual}</span></p>
             </div>
             <button

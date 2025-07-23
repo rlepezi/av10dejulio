@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, query, orderBy, where, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, orderBy, where, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { NotificationService } from '../utils/notificationService';
@@ -36,7 +36,7 @@ export default function AdminSolicitudesProveedor() {
         telefono_representante: "+56987654321",
         necesita_pagina_web: true,
         tipo_pagina_web: "E-commerce",
-        estado_general: "enviada",
+        estado: "pendiente",
         etapa_actual: "revision_inicial",
         progreso_porcentaje: 20,
         fecha_solicitud: new Date(),
@@ -50,7 +50,7 @@ export default function AdminSolicitudesProveedor() {
         }
       };
 
-      await addDoc(collection(db, 'solicitudes_proveedor'), solicitudPrueba);
+      await addDoc(collection(db, 'solicitudes_empresa'), solicitudPrueba);
       console.log('Solicitud de prueba creada');
       window.location.reload();
     } catch (error) {
@@ -66,7 +66,7 @@ export default function AdminSolicitudesProveedor() {
         console.log('📊 Base de datos:', db);
         
         // Verificar primero si podemos acceder a la colección
-        const solicitudesCollection = collection(db, 'solicitudes_proveedor');
+        const solicitudesCollection = collection(db, 'solicitudes_empresa');
         console.log('📁 Colección obtenida:', solicitudesCollection);
         
         const solicitudesQuery = query(
@@ -93,7 +93,7 @@ export default function AdminSolicitudesProveedor() {
           console.log('📄 Solicitud procesada:', {
             id: data.id,
             empresa: data.nombre_empresa,
-            estado: data.estado_general
+            estado: data.estado
           });
           return data;
         });
@@ -134,7 +134,7 @@ export default function AdminSolicitudesProveedor() {
 
   // Filtrar solicitudes
   const solicitudesFiltradas = solicitudes.filter(solicitud => {
-    const matchEstado = !filtros.estado || solicitud.estado_general === filtros.estado;
+    const matchEstado = !filtros.estado || solicitud.estado === filtros.estado;
     const matchEtapa = !filtros.etapa || solicitud.etapa_actual === filtros.etapa;
     const matchWeb = !filtros.necesita_web || solicitud.necesita_pagina_web.toString() === filtros.necesita_web;
     const matchBusqueda = !filtros.busqueda || 
@@ -180,7 +180,7 @@ export default function AdminSolicitudesProveedor() {
       const indiceEtapa = etapasOrden.indexOf(nuevaEtapa);
       const progreso = Math.round(((indiceEtapa + 1) / etapasOrden.length) * 100);
 
-      const docRef = doc(db, 'solicitudes_proveedor', solicitudId);
+      const docRef = doc(db, 'solicitudes_empresa', solicitudId);
       await updateDoc(docRef, {
         etapa_actual: nuevaEtapa,
         progreso_porcentaje: progreso,
@@ -199,7 +199,7 @@ export default function AdminSolicitudesProveedor() {
           nuevaEtapa: nuevaEtapa,
           progreso: progreso,
           comentarios: comentarios,
-          origen: 'admin_solicitudes_proveedor'
+          origen: 'admin_solicitudes_empresa'
         }
       );
 
@@ -229,9 +229,9 @@ export default function AdminSolicitudesProveedor() {
       console.log('🚀 Iniciando aprobación de solicitud:', solicitudId);
 
       // 1. Actualizar el estado de la solicitud a aprobada
-      const docRef = doc(db, 'solicitudes_proveedor', solicitudId);
+      const docRef = doc(db, 'solicitudes_empresa', solicitudId);
       await updateDoc(docRef, {
-        estado_general: 'aprobada',
+        estado: 'aprobada',
         etapa_actual: 'aprobacion_final',
         progreso_porcentaje: 100,
         fecha_aprobacion: new Date()
@@ -239,32 +239,67 @@ export default function AdminSolicitudesProveedor() {
 
       console.log('✅ Solicitud actualizada a aprobada');
 
+      // Debug: Ver datos de la solicitud
+      console.log('🔍 Datos completos de solicitud:', solicitud);
+      console.log('🔍 Campos específicos:', {
+        nombres_representante: solicitud.nombres_representante,
+        apellidos_representante: solicitud.apellidos_representante,
+        email_representante: solicitud.email_representante,
+        nombre_empresa: solicitud.nombre_empresa,
+        categoria: solicitud.categoria,
+        rubro: solicitud.rubro
+      });
+
+      // Función para limpiar undefined de objetos
+      const cleanUndefined = (obj) => {
+        const cleaned = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined && value !== null) {
+            if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+              cleaned[key] = cleanUndefined(value);
+            } else {
+              cleaned[key] = value;
+            }
+          }
+        }
+        return cleaned;
+      };
+
       // 2. Crear empresa en la colección 'empresas' con estado 'Activa'
-      const nuevaEmpresa = {
+      const nuevaEmpresaRaw = {
         // Información básica de la empresa
-        nombre: solicitud.nombre_empresa,
-        email: solicitud.email_empresa,
-        telefono: solicitud.telefono_empresa,
-        direccion: solicitud.direccion_empresa,
-        comuna: solicitud.comuna,
-        region: solicitud.region,
+        nombre: solicitud.nombre_empresa || 'Sin nombre',
+        email: solicitud.email_empresa || '',
+        telefono: solicitud.telefono_empresa || '',
+        direccion: solicitud.direccion_empresa || '',
+        comuna: solicitud.comuna || '',
+        region: solicitud.region || '',
         web: solicitud.web_actual || '',
-        rut: solicitud.rut_empresa,
+        rut: solicitud.rut_empresa || '',
         
-        // Información del representante
-        representante: {
-          nombres: solicitud.nombres_representante,
-          apellidos: solicitud.apellidos_representante,
-          cargo: solicitud.cargo_representante,
-          email: solicitud.email_representante,
-          telefono: solicitud.telefono_representante
-        },
+        // Información del representante - solo agregar si existen
+        ...(solicitud.nombres_representante || solicitud.apellidos_representante || solicitud.email_representante ? {
+          representante: {
+            ...(solicitud.nombres_representante && { nombre: solicitud.nombres_representante }),
+            ...(solicitud.nombres_representante && { nombres: solicitud.nombres_representante }),
+            ...(solicitud.apellidos_representante && { apellido: solicitud.apellidos_representante }),
+            ...(solicitud.apellidos_representante && { apellidos: solicitud.apellidos_representante }),
+            ...(solicitud.cargo_representante && { cargo: solicitud.cargo_representante }),
+            ...(solicitud.email_representante && { email: solicitud.email_representante }),
+            ...(solicitud.telefono_representante && { telefono: solicitud.telefono_representante })
+          }
+        } : {}),
         
         // Información del negocio
-        descripcion: solicitud.descripcion_negocio || '',
+        descripcion: solicitud.descripcion_negocio || solicitud.descripcion || '',
         anos_funcionamiento: solicitud.anos_funcionamiento || 0,
         numero_empleados: solicitud.numero_empleados || 0,
         horario_atencion: solicitud.horario_atencion || '',
+        
+        // Categoría y rubro
+        categoria: solicitud.categoria || 'Sin categoría',
+        rubro: solicitud.rubro || solicitud.categoria || 'General',
+        tipoEmpresa: solicitud.tipoEmpresa || 'proveedor',
         
         // Servicios y marcas
         categorias: solicitud.categorias_servicios || [],
@@ -272,7 +307,7 @@ export default function AdminSolicitudesProveedor() {
         
         // Estado y fechas
         estado: 'Activa',
-        fecha_postulacion: solicitud.fecha_solicitud,
+        fecha_postulacion: solicitud.fecha_solicitud || new Date(),
         fecha_aprobacion: new Date(),
         fecha_registro: new Date(),
         
@@ -283,56 +318,81 @@ export default function AdminSolicitudesProveedor() {
         
         // Metadatos de la solicitud
         solicitud_id: solicitudId,
-        aprobado_por: user.email,
+        aprobado_por: user?.email || 'admin',
         
         // Campos requeridos por el sistema existente
-        logo: '', // Se puede actualizar después
+        logo: '',
+        logoAsignado: false,
         valoracion: 0,
         reviews: 0,
         verificado: true,
         destacado: false
       };
 
-      const empresaRef = await addDoc(collection(db, 'empresas'), nuevaEmpresa);
-      console.log('✅ Empresa creada en colección empresas:', empresaRef.id);
+      // Limpiar campos undefined
+      const nuevaEmpresa = cleanUndefined(nuevaEmpresaRaw);
 
-      // 3. Actualizar la solicitud con el ID de la empresa creada
-      await updateDoc(docRef, {
-        empresa_id: empresaRef.id,
-        empresa_activa: true
-      });
+      // Debug: Verificar que no hay campos undefined
+      console.log('🔍 Empresa a crear:', nuevaEmpresa);
+      console.log('🔍 Representante:', nuevaEmpresa.representante);
 
-      console.log('✅ Solicitud vinculada con empresa');
-      
-      // 4. Enviar notificación de aprobación
-      await NotificationService.createInAppNotification(
-        solicitud.email_representante,
-        'validacion',
-        '¡Felicidades! Tu solicitud de proveedor ha sido aprobada',
-        `${solicitud.nombre_empresa} ya está activo como proveedor en AV10 de Julio y aparece en la lista pública de proveedores.`,
-        {
-          solicitudId: solicitudId,
-          empresaId: empresaRef.id,
-          empresaNombre: solicitud.nombre_empresa,
-          estado: 'aprobada',
-          origen: 'admin_aprobacion_proveedor'
+      try {
+        const empresaRef = await addDoc(collection(db, 'empresas'), nuevaEmpresa);
+        console.log('✅ Empresa creada exitosamente en colección empresas:', empresaRef.id);
+
+        // 3. Actualizar la solicitud con el ID de la empresa creada
+        await updateDoc(docRef, {
+          empresa_id: empresaRef.id,
+          empresa_activa: true
+        });
+
+        console.log('✅ Solicitud vinculada con empresa ID:', empresaRef.id);
+        
+        // Verificar que la empresa fue creada correctamente
+        const empresaCreada = await getDoc(doc(db, 'empresas', empresaRef.id));
+        if (empresaCreada.exists()) {
+          console.log('✅ Verificación: Empresa existe en la colección empresas');
+          console.log('📊 Datos de la empresa creada:', empresaCreada.data());
+        } else {
+          console.error('❌ Error: La empresa no se encontró después de la creación');
         }
-      );
+        
+        // 4. Enviar notificación de aprobación
+        await NotificationService.createInAppNotification(
+          solicitud.email_representante,
+          'validacion',
+          '¡Felicidades! Tu solicitud de proveedor ha sido aprobada',
+          `${solicitud.nombre_empresa} ya está activo como proveedor en AV10 de Julio y aparece en la lista pública de proveedores.`,
+          {
+            solicitudId: solicitudId,
+            empresaId: empresaRef.id,
+            empresaNombre: solicitud.nombre_empresa,
+            estado: 'aprobada',
+            origen: 'admin_aprobacion_proveedor'
+          }
+        );
 
-      // 5. Actualizar estado local
-      setSolicitudes(prev => prev.map(s => 
-        s.id === solicitudId 
-          ? { 
-              ...s, 
-              estado_general: 'aprobada', 
-              progreso_porcentaje: 100,
-              empresa_id: empresaRef.id,
-              empresa_activa: true
-            }
-          : s
-      ));
+        console.log('✅ Notificación enviada');
 
-      alert(`¡Solicitud aprobada exitosamente! ${solicitud.nombre_empresa} ahora aparece como proveedor activo.`);
+        // 5. Actualizar estado local
+        setSolicitudes(prev => prev.map(s => 
+          s.id === solicitudId 
+            ? { 
+                ...s, 
+                estado: 'aprobada', 
+                progreso_porcentaje: 100,
+                empresa_id: empresaRef.id,
+                empresa_activa: true
+              }
+            : s
+        ));
+
+        alert(`¡Solicitud aprobada exitosamente! ${solicitud.nombre_empresa} ahora aparece como proveedor activo.`);
+        
+      } catch (empresaError) {
+        console.error('❌ Error creando empresa:', empresaError);
+        throw new Error(`Error al crear empresa: ${empresaError.message}`);
+      }
     } catch (error) {
       console.error('❌ Error approving request:', error);
       alert('Error al aprobar la solicitud: ' + error.message);
@@ -351,9 +411,9 @@ export default function AdminSolicitudesProveedor() {
       console.log('🚫 Iniciando rechazo de solicitud:', solicitudId);
 
       // 1. Actualizar el estado de la solicitud a rechazada
-      const docRef = doc(db, 'solicitudes_proveedor', solicitudId);
+      const docRef = doc(db, 'solicitudes_empresa', solicitudId);
       await updateDoc(docRef, {
-        estado_general: 'rechazada',
+        estado: 'rechazada',
         motivo_rechazo: motivo,
         fecha_rechazo: new Date()
       });
@@ -400,7 +460,7 @@ export default function AdminSolicitudesProveedor() {
         s.id === solicitudId 
           ? { 
               ...s, 
-              estado_general: 'rechazada', 
+              estado: 'rechazada', 
               motivo_rechazo: motivo,
               empresa_activa: false
             }
@@ -479,19 +539,19 @@ export default function AdminSolicitudesProveedor() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-yellow-800">
-            {solicitudes.filter(s => s.estado_general === 'enviada').length}
+            {solicitudes.filter(s => s.estado === 'pendiente').length}
           </div>
           <div className="text-yellow-600">Nuevas</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-blue-800">
-            {solicitudes.filter(s => s.estado_general === 'en_revision').length}
+            {solicitudes.filter(s => s.estado === 'en_revision').length}
           </div>
           <div className="text-blue-600">En Revisión</div>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-800">
-            {solicitudes.filter(s => s.estado_general === 'aprobada').length}
+            {solicitudes.filter(s => s.estado === 'aprobada').length}
           </div>
           <div className="text-green-600">Aprobadas</div>
         </div>
@@ -656,12 +716,12 @@ export default function AdminSolicitudesProveedor() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      solicitud.estado_general === 'enviada' ? 'bg-yellow-100 text-yellow-800' :
-                      solicitud.estado_general === 'en_revision' ? 'bg-blue-100 text-blue-800' :
-                      solicitud.estado_general === 'aprobada' ? 'bg-green-100 text-green-800' :
+                      solicitud.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                      solicitud.estado === 'en_revision' ? 'bg-blue-100 text-blue-800' :
+                      solicitud.estado === 'aprobada' ? 'bg-green-100 text-green-800' :
                       'bg-red-100 text-red-800'
                     }`}>
-                      {solicitud.estado_general}
+                      {solicitud.estado}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -694,7 +754,7 @@ export default function AdminSolicitudesProveedor() {
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                         ✓ Activa
                       </span>
-                    ) : solicitud.estado_general === 'aprobada' ? (
+                    ) : solicitud.estado === 'aprobada' ? (
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
                         ⏳ Pendiente
                       </span>

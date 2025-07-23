@@ -16,6 +16,7 @@ export default function RegistroEmpresa() {
     rutEmpresa: '',
     razonSocial: '',
     giroComercial: '',
+    rubro: '', // Nuevo campo para rubro específico
     
     // Tipo de empresa unificado
     tipoEmpresa: 'proveedor', // proveedor, pyme, emprendimiento, taller, distribuidor
@@ -62,11 +63,9 @@ export default function RegistroEmpresa() {
   });
 
   const tiposEmpresa = [
-    { value: 'proveedor', label: 'Proveedor Automotriz', description: 'Distribuidor o fabricante de repuestos' },
-    { value: 'pyme', label: 'PyME Automotriz', description: 'Pequeña o mediana empresa del rubro' },
-    { value: 'emprendimiento', label: 'Emprendimiento', description: 'Nuevo negocio en el sector automotriz' },
-    { value: 'taller', label: 'Taller Mecánico', description: 'Servicios de reparación y mantención' },
-    { value: 'distribuidor', label: 'Distribuidor Local', description: 'Venta local de repuestos y accesorios' }
+    { value: 'proveedor', label: 'Proveedor', description: 'Distribuidor o fabricante de repuestos y servicios' },
+    { value: 'pyme', label: 'PyME', description: 'Pequeña o mediana empresa del rubro automotriz' },
+    { value: 'emprendimiento', label: 'Emprendimiento', description: 'Nuevo negocio en el sector automotriz' }
   ];
 
   const sectoresAutomotriz = [
@@ -83,6 +82,32 @@ export default function RegistroEmpresa() {
     'Equipos de Diagnóstico',
     'Servicios de Mantención',
     'Seguros Automotrices',
+    'Otros'
+  ];
+
+  const rubrosEspecificos = [
+    'Repuestos',
+    'Lubricantes',
+    'Neumáticos',
+    'Baterías',
+    'Frenos',
+    'Eléctrico',
+    'Carrocería',
+    'Escapes',
+    'Filtros',
+    'Herramientas',
+    'Diagnóstico',
+    'Mantención',
+    'Seguros',
+    'Accesorios',
+    'Vulcanización',
+    'Mecánica',
+    'Pintura',
+    'Tapicería',
+    'Audio y Alarmas',
+    'Climatización',
+    'Transmisión',
+    'Suspensión',
     'Otros'
   ];
 
@@ -137,7 +162,7 @@ export default function RegistroEmpresa() {
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        return formData.nombreEmpresa && formData.rutEmpresa && formData.tipoEmpresa && formData.sectorAutomotriz;
+        return formData.nombreEmpresa && formData.rutEmpresa && formData.tipoEmpresa && formData.sectorAutomotriz && formData.rubro;
       case 2:
         return formData.direccion && formData.comuna && formData.region && formData.telefono && formData.email;
       case 3:
@@ -165,8 +190,8 @@ export default function RegistroEmpresa() {
 
     setLoading(true);
     try {
-      // Determinar la colección basada en el tipo de empresa
-      const collectionName = formData.tipoEmpresa === 'proveedor' ? 'solicitudes_proveedor' : 'solicitudes_empresa';
+      // Usar colección unificada para todos los tipos de empresa
+      const collectionName = 'solicitudes_empresa';
       
       const solicitudData = {
         ...formData,
@@ -176,8 +201,7 @@ export default function RegistroEmpresa() {
         // Datos calculados
         esEmprendimiento: formData.tipoEmpresa === 'emprendimiento',
         esPyme: formData.tipoEmpresa === 'pyme',
-        esTaller: formData.tipoEmpresa === 'taller',
-        esDistribuidor: formData.tipoEmpresa === 'distribuidor',
+        esProveedor: formData.tipoEmpresa === 'proveedor',
         requiereValidacion: true,
         puntuacionComplitud: calcularPuntuacionComplitud(formData)
       };
@@ -324,6 +348,24 @@ export default function RegistroEmpresa() {
           <option value="">Selecciona un sector</option>
           {sectoresAutomotriz.map((sector) => (
             <option key={sector} value={sector}>{sector}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Rubro Específico *
+        </label>
+        <select
+          name="rubro"
+          value={formData.rubro}
+          onChange={handleInputChange}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          required
+        >
+          <option value="">Selecciona un rubro específico</option>
+          {rubrosEspecificos.map((rubro) => (
+            <option key={rubro} value={rubro}>{rubro}</option>
           ))}
         </select>
       </div>

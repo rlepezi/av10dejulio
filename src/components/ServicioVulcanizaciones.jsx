@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 
@@ -25,9 +25,42 @@ export default function ServicioVulcanizaciones() {
 
   const loadData = async () => {
     try {
-      // Cargar vulcanizadoras
-      const vulcanizadorasSnapshot = await getDocs(collection(db, 'vulcanizadoras'));
-      setVulcanizadoras(vulcanizadorasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // Cargar vulcanizadoras desde la colección empresas
+      // Filtrar por rubro = "Vulcanización" y tipoempresa = "pyme"
+      const vulcanizadorasQuery = query(
+        collection(db, 'empresas'),
+        where('rubro', '==', 'Vulcanización'),
+        where('tipoEmpresa', '==', 'pyme'),
+        where('estado', '==', 'Activa')
+      );
+      const vulcanizadorasSnapshot = await getDocs(vulcanizadorasQuery);
+      const empresasVulcanizacion = vulcanizadorasSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Mapear campos de empresa a formato esperado por vulcanizadora
+          nombre: data.nombre || data.razonSocial,
+          direccion: data.direccion,
+          comuna: data.comuna,
+          telefono: data.telefono,
+          email: data.email,
+          horarios: data.horarios || 'L-V 8:00-18:00, S 8:00-13:00',
+          servicios: data.servicios || [
+            'Parche de Neumático',
+            'Cambio de Neumático', 
+            'Balanceado',
+            'Alineación'
+          ],
+          precioBase: data.precioBase || 15000,
+          emergencia24h: data.emergencia24h || false,
+          servicioDomicilio: data.servicioDomicilio || true,
+          rating: data.rating || 4.2,
+          tiempoRespuesta: data.tiempoRespuesta || '20',
+          promociones: data.promociones || false
+        };
+      });
+      setVulcanizadoras(empresasVulcanizacion);
 
       // Cargar tipos de servicios
       const serviciosSnapshot = await getDocs(collection(db, 'tipos_servicios_vulcanizadora'));
@@ -96,7 +129,11 @@ export default function ServicioVulcanizaciones() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">🏁 Vulcanizaciones</h1>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">🏁 Vulcanizaciones</h1>
+        <p className="text-gray-600 mb-6">
+          Encuentra PyMEs especializadas en servicios de vulcanización y neumáticos. 
+          Estas empresas forman parte de nuestra red de proveedores locales registrados.
+        </p>
         
         {/* Tabs */}
         <div className="flex space-x-4 mb-6 border-b">
@@ -190,8 +227,23 @@ export default function ServicioVulcanizaciones() {
               <h3 className="text-lg font-semibold mb-4">
                 Vulcanizadoras Disponibles ({vulcanizadorasFiltradas.length})
               </h3>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {vulcanizadorasFiltradas.map(vulcanizadora => (
+              
+              {vulcanizadorasFiltradas.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">🏁</div>
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                    No hay vulcanizadoras disponibles
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    No se encontraron empresas de vulcanización que coincidan con tus criterios de búsqueda.
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Las vulcanizadoras listadas son PyMEs especializadas en servicios de neumáticos.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {vulcanizadorasFiltradas.map(vulcanizadora => (
                   <div key={vulcanizadora.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -271,7 +323,8 @@ export default function ServicioVulcanizaciones() {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}

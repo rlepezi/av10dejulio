@@ -27,17 +27,7 @@ export default function AdminSolicitudesEmpresa() {
     try {
       setLoading(true);
       
-      // Cargar solicitudes de proveedores
-      const solicitudesProveedorCollection = collection(db, 'solicitudes_proveedor');
-      const queryProveedor = query(solicitudesProveedorCollection, orderBy('fechaSolicitud', 'desc'));
-      const snapshotProveedor = await getDocs(queryProveedor);
-      const solicitudesProveedorData = snapshotProveedor.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        coleccion: 'solicitudes_proveedor'
-      }));
-
-      // Cargar solicitudes de empresas
+      // Cargar todas las solicitudes desde la colección unificada
       const solicitudesEmpresaCollection = collection(db, 'solicitudes_empresa');
       const queryEmpresa = query(solicitudesEmpresaCollection, orderBy('fechaSolicitud', 'desc'));
       const snapshotEmpresa = await getDocs(queryEmpresa);
@@ -57,7 +47,8 @@ export default function AdminSolicitudesEmpresa() {
         coleccion: 'empresas'
       }));
 
-      setSolicitudesProveedor(solicitudesProveedorData);
+      // Todas las solicitudes están ahora en solicitudes_empresa
+      setSolicitudesProveedor([]); // Vacío ya que todo está unificado
       setSolicitudesEmpresa(solicitudesEmpresaData);
       setEmpresasRegistradas(empresasData);
     } catch (error) {

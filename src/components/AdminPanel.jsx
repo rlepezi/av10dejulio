@@ -20,16 +20,34 @@ function AdminPanel({ user }) {
   useEffect(() => {
     const cargarEstadisticas = async () => {
       try {
+        console.log('📊 Cargando estadísticas del dashboard...');
+        
         // Empresas
         const empresasSnapshot = await getDocs(collection(db, 'empresas'));
-        const empresasActivas = empresasSnapshot.docs.filter(doc => doc.data().estado === 'Activa');
+        const empresasActivas = empresasSnapshot.docs.filter(doc => {
+          const estado = doc.data().estado;
+          return estado === 'activa' || estado === 'Activa';
+        });
+        console.log('🏢 Empresas encontradas:', empresasSnapshot.size, 'Activas:', empresasActivas.length);
         
-        // Solicitudes proveedores pendientes
-        const solicitudesQuery = query(
-          collection(db, 'solicitudes_proveedor'),
-          where('estado_general', 'in', ['enviada', 'en_revision'])
+        // Solicitudes de empresas/proveedores pendientes (colección principal)
+        const solicitudesEmpresaQuery = query(
+          collection(db, 'solicitudes_empresa'),
+          where('estado', 'in', ['pendiente', 'en_revision'])
         );
-        const solicitudesSnapshot = await getDocs(solicitudesQuery);
+        const solicitudesEmpresaSnapshot = await getDocs(solicitudesEmpresaQuery);
+        console.log('📋 Solicitudes empresa pendientes:', solicitudesEmpresaSnapshot.size);
+        
+        // Solicitudes de proveedores (colección unificada)
+        const solicitudesProveedorQuery = query(
+          collection(db, 'solicitudes_empresa'),
+          where('estado', 'in', ['pendiente', 'en_revision'])
+        );
+        const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
+        console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);
+        
+        // Total de solicitudes pendientes
+        const totalSolicitudesPendientes = solicitudesEmpresaSnapshot.size + solicitudesProveedorSnapshot.size;
         
         // Solicitudes clientes pendientes
         const clientesQuery = query(
@@ -37,19 +55,24 @@ function AdminPanel({ user }) {
           where('estado', '==', 'pendiente')
         );
         const clientesSnapshot = await getDocs(clientesQuery);
+        console.log('👥 Solicitudes cliente pendientes:', clientesSnapshot.size);
 
         // Campañas
         const campañasSnapshot = await getDocs(collection(db, 'campañas'));
+        console.log('📢 Campañas totales:', campañasSnapshot.size);
 
-        setStats({
+        const nuevasStats = {
           totalEmpresas: empresasSnapshot.size,
           empresasActivas: empresasActivas.length,
-          solicitudesPendientes: solicitudesSnapshot.size,
+          solicitudesPendientes: totalSolicitudesPendientes,
           clientesPendientes: clientesSnapshot.size,
           totalCampañas: campañasSnapshot.size
-        });
+        };
+        
+        console.log('✅ Estadísticas actualizadas:', nuevasStats);
+        setStats(nuevasStats);
       } catch (error) {
-        console.error('Error cargando estadísticas:', error);
+        console.error('❌ Error cargando estadísticas:', error);
       } finally {
         setLoading(false);
       }
@@ -58,15 +81,94 @@ function AdminPanel({ user }) {
     cargarEstadisticas();
   }, []);
 
+  const recargarEstadisticas = async () => {
+    setLoading(true);
+    console.log('🔄 Recargando estadísticas manualmente...');
+    
+    try {
+      // Empresas
+      const empresasSnapshot = await getDocs(collection(db, 'empresas'));
+      const empresasActivas = empresasSnapshot.docs.filter(doc => {
+        const estado = doc.data().estado;
+        return estado === 'activa' || estado === 'Activa';
+      });
+      console.log('🏢 Empresas encontradas:', empresasSnapshot.size, 'Activas:', empresasActivas.length);
+      
+      // Solicitudes de empresas/proveedores pendientes (colección principal)
+      const solicitudesEmpresaQuery = query(
+        collection(db, 'solicitudes_empresa'),
+        where('estado', 'in', ['pendiente', 'en_revision'])
+      );
+      const solicitudesEmpresaSnapshot = await getDocs(solicitudesEmpresaQuery);
+      console.log('📋 Solicitudes empresa pendientes:', solicitudesEmpresaSnapshot.size);
+      
+      // Solicitudes de proveedores (colección unificada)
+      const solicitudesProveedorQuery = query(
+        collection(db, 'solicitudes_empresa'),
+        where('estado', 'in', ['pendiente', 'en_revision'])
+      );
+      const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
+      console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);
+      
+      // Total de solicitudes pendientes
+      const totalSolicitudesPendientes = solicitudesEmpresaSnapshot.size + solicitudesProveedorSnapshot.size;
+      
+      // Solicitudes clientes pendientes
+      const clientesQuery = query(
+        collection(db, 'solicitudes_cliente'),
+        where('estado', '==', 'pendiente')
+      );
+      const clientesSnapshot = await getDocs(clientesQuery);
+      console.log('👥 Solicitudes cliente pendientes:', clientesSnapshot.size);
+
+      // Campañas
+      const campañasSnapshot = await getDocs(collection(db, 'campañas'));
+      console.log('📢 Campañas totales:', campañasSnapshot.size);
+
+      const nuevasStats = {
+        totalEmpresas: empresasSnapshot.size,
+        empresasActivas: empresasActivas.length,
+        solicitudesPendientes: totalSolicitudesPendientes,
+        clientesPendientes: clientesSnapshot.size,
+        totalCampañas: campañasSnapshot.size
+      };
+      
+      console.log('✅ Estadísticas recargadas:', nuevasStats);
+      setStats(nuevasStats);
+    } catch (error) {
+      console.error('❌ Error recargando estadísticas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Panel de Administración
-        </h1>
-        <p className="text-gray-600">
-          Bienvenido, {user?.email}. Gestiona todo el sistema desde aquí.
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Panel de Administración
+          </h1>
+          <p className="text-gray-600">
+            Bienvenido, {user?.email}. Gestiona todo el sistema desde aquí.
+          </p>
+        </div>
+        <button
+          onClick={recargarEstadisticas}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Cargando...
+            </>
+          ) : (
+            <>
+              🔄 Actualizar Estadísticas
+            </>
+          )}
+        </button>
       </div>
 
       {/* Navegación de pestañas */}
@@ -146,7 +248,7 @@ function AdminPanel({ user }) {
               <h3 className="font-semibold text-lg text-gray-900 mb-4">🏪 Gestión de Proveedores</h3>
               <div className="space-y-3">
                 <Link 
-                  to="/admin/solicitudes-proveedor" 
+                  to="/admin/solicitudes-registro" 
                   className="block w-full text-left px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm text-blue-700 transition-colors"
                 >
                   📋 Solicitudes Pendientes ({stats.solicitudesPendientes})

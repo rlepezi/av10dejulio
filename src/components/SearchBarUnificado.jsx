@@ -67,48 +67,25 @@ const SearchBarUnificado = ({
     return () => unsubscribe();
   }, []);
 
-  // Cargar solicitudes aprobadas
+  // Cargar solicitudes aprobadas desde colección unificada
   useEffect(() => {
-    const qProveedores = query(
-      collection(db, "solicitudes_proveedor"),
-      where("estado", "==", "aprobada")
-    );
-    
-    const qEmpresas = query(
+    const qSolicitudes = query(
       collection(db, "solicitudes_empresa"),
       where("estado", "==", "aprobada")
     );
 
-    const unsubProveedores = onSnapshot(qProveedores, (snapshot) => {
-      const proveedoresData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        tipo: 'empresa',
-        origen: 'nuevo',
-        tipoEmpresa: 'proveedor'
-      }));
-      setSolicitudesAprobadas(prev => [
-        ...prev.filter(s => s.origen !== 'nuevo' || s.tipoEmpresa !== 'proveedor'),
-        ...proveedoresData
-      ]);
-    });
-
-    const unsubEmpresas = onSnapshot(qEmpresas, (snapshot) => {
-      const empresasData = snapshot.docs.map(doc => ({
+    const unsubSolicitudes = onSnapshot(qSolicitudes, (snapshot) => {
+      const solicitudesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         tipo: 'empresa',
         origen: 'nuevo'
       }));
-      setSolicitudesAprobadas(prev => [
-        ...prev.filter(s => s.origen !== 'nuevo' || s.tipoEmpresa === 'proveedor'),
-        ...empresasData
-      ]);
+      setSolicitudesAprobadas(solicitudesData);
     });
 
     return () => {
-      unsubProveedores();
-      unsubEmpresas();
+      unsubSolicitudes();
     };
   }, []);
 
