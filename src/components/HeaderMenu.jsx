@@ -8,7 +8,7 @@ import NotificationCenter from "./NotificationCenter";
 export default function HeaderMenu() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, rol } = useAuth();
+  const { user, rol, loading } = useAuth();
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [showServiciosMenu, setShowServiciosMenu] = useState(false);
 
@@ -198,7 +198,7 @@ export default function HeaderMenu() {
                   <button
                     className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm"
                     onClick={() => {
-                      navigate("/admin/solicitudes-proveedor");
+                      navigate("/admin/solicitudes-registro");
                       setShowAdminMenu(false);
                     }}
                   >
@@ -273,8 +273,8 @@ export default function HeaderMenu() {
           </button>
         ) : null}
 
-        {/* Proveedores y Empresas - ocultos para clientes Y para admin */}
-        {!user || (user && rol !== "cliente" && rol !== "admin") ? (
+        {/* Proveedores y Empresas - siempre mostrar, ocultar solo si es admin o cliente autenticado */}
+        {(!loading && user && (rol === "admin" || rol === "cliente")) ? null : (
           <>
             <button
               className={activeClass("/proveedores")}
@@ -289,10 +289,19 @@ export default function HeaderMenu() {
                 closeAllMenus();
               }}
             >
-              🏪 Empresas
+              🏪 PyME
             </button>
           </>
-        ) : null}
+        )}
+        <button
+          className={activeClass("/area-cliente")}
+          onClick={() => {
+            navigate("/area-cliente");
+            closeAllMenus();
+          }}
+        >
+          👤 Área Cliente
+        </button>
         <button
           className={activeClass("/recursos")}
           onClick={() => {
@@ -321,8 +330,8 @@ export default function HeaderMenu() {
           Contacto
         </button>
         
-        {/* Servicios Automotrices - solo para no admin */}
-        {!user || (user && rol !== "admin") ? (
+        {/* Servicios Automotrices - siempre mostrar, ocultar solo si es admin autenticado */}
+        {(!loading && user && rol === "admin") ? null : (
           <div className="relative">
             <button
               className="hover:underline flex items-center gap-1"
@@ -383,7 +392,7 @@ export default function HeaderMenu() {
               </div>
             )}
           </div>
-        ) : null}
+        )}
         {/* Solo admin logueado y en proveedores: empresas, campañas, productos */}
         {user && rol === "admin" && isInProveedores && (
           <>
@@ -430,39 +439,209 @@ export default function HeaderMenu() {
             Mis Consultas
           </button>
         )}
-        {!user && (
-          <div className="flex items-center gap-2">
-            <div className="flex gap-2">
-              <button
-                className="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
-                onClick={() => navigate("/registro-cliente")}
-              >
-                🚗 Cliente
-              </button>
-              <button
-                className="bg-green-100 text-green-800 px-3 py-1 rounded text-sm hover:bg-green-200 transition-colors"
-                onClick={() => navigate("/registro-proveedor")}
-              >
-                🏪 Proveedor
-              </button>
-            </div>
-            <button
-              className="bg-white text-blue-800 rounded px-4 py-1 font-semibold hover:bg-gray-100 transition-colors"
-              onClick={() => navigate("/login")}
-            >
-              Iniciar sesión
-            </button>
-          </div>
-        )}
         {user && (
-          <button
-            className="bg-red-600 hover:bg-red-800 text-white rounded px-4 py-1 font-semibold"
-            onClick={handleLogout}
-          >
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Información del usuario y menú de perfil */}
+            <UserProfileMenu 
+              user={user} 
+              rol={rol} 
+              onLogout={handleLogout}
+              navigate={navigate}
+            />
+          </div>
         )}
       </div>
     </nav>
+  );
+}
+
+// Componente para el menú de perfil del usuario
+function UserProfileMenu({ user, rol, onLogout, navigate }) {
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const getDashboardRoute = () => {
+    switch(rol) {
+      case 'admin': return '/admin';
+      case 'proveedor': return '/dashboard/proveedor';
+      case 'agente': return '/agente';
+      case 'mecanico': return '/dashboard/mecanico';
+      case 'cliente': return '/dashboard/cliente';
+      default: return '/dashboard/cliente';
+    }
+  };
+
+  const getRolDisplayName = () => {
+    switch(rol) {
+      case 'admin': return 'Administrador';
+      case 'proveedor': return 'Proveedor';
+      case 'agente': return 'Agente de Campo';
+      case 'mecanico': return 'Mecánico';
+      case 'cliente': return 'Cliente';
+      default: return 'Usuario';
+    }
+  };
+
+  const getRolIcon = () => {
+    switch(rol) {
+      case 'admin': return '👑';
+      case 'proveedor': return '🏪';
+      case 'agente': return '👨‍💼';
+      case 'mecanico': return '🔧';
+      case 'cliente': return '🚗';
+      default: return '👤';
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Botón del perfil */}
+      <button
+        onClick={() => setShowProfileMenu(!showProfileMenu)}
+        className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-lg transition-colors"
+      >
+        <span className="text-lg">{getRolIcon()}</span>
+        <div className="text-left hidden md:block">
+          <div className="text-xs text-blue-200">Hola,</div>
+          <div className="text-sm font-medium truncate max-w-32" title={user.email}>
+            {user.displayName || user.email?.split('@')[0] || 'Usuario'}
+          </div>
+        </div>
+        <span className="text-xs">▼</span>
+      </button>
+
+      {/* Menú desplegable del perfil */}
+      {showProfileMenu && (
+        <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-64 z-50">
+          {/* Header del menú */}
+          <div className="px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
+                {getRolIcon()}
+              </div>
+              <div>
+                <div className="font-medium text-gray-900">
+                  {user.displayName || user.email?.split('@')[0] || 'Usuario'}
+                </div>
+                <div className="text-sm text-gray-500">{getRolDisplayName()}</div>
+                <div className="text-xs text-gray-400">{user.email}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Opciones del menú */}
+          <div className="py-2">
+            <button
+              onClick={() => {
+                navigate(getDashboardRoute());
+                setShowProfileMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+            >
+              <span>📊</span>
+              <span>Mi Dashboard</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/");
+                setShowProfileMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+            >
+              <span>🏠</span>
+              <span>Ir al Inicio</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigate("/mis-consultas");
+                setShowProfileMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+            >
+              <span>💬</span>
+              <span>Mis Consultas</span>
+            </button>
+
+            {rol === 'proveedor' && (
+              <>
+                <button
+                  onClick={() => {
+                    navigate("/dashboard/proveedor/perfil");
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span>👤</span>
+                  <span>Mi Perfil</span>
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/dashboard/proveedor/productos");
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span>📦</span>
+                  <span>Mis Productos</span>
+                </button>
+              </>
+            )}
+
+            {rol === 'cliente' && (
+              <>
+                <button
+                  onClick={() => {
+                    navigate("/dashboard/cliente/perfil");
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span>👤</span>
+                  <span>Mi Perfil</span>
+                </button>
+                <button
+                  onClick={() => {
+                    navigate("/dashboard/cliente/vehiculos");
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span>🚗</span>
+                  <span>Mis Vehículos</span>
+                </button>
+              </>
+            )}
+
+            {rol === 'agente' && (
+              <button
+                onClick={() => {
+                  navigate("/agente/empresas");
+                  setShowProfileMenu(false);
+                }}
+                className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+              >
+                <span>🏢</span>
+                <span>Registrar Empresa</span>
+              </button>
+            )}
+          </div>
+
+          {/* Botón de cerrar sesión */}
+          <div className="border-t border-gray-200 pt-2">
+            <button
+              onClick={() => {
+                onLogout();
+                setShowProfileMenu(false);
+              }}
+              className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center gap-3"
+            >
+              <span>🚪</span>
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

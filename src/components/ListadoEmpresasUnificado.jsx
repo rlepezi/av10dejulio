@@ -12,149 +12,59 @@ export default function ListadoEmpresasUnificado({
   onEmpresaClick
 }) {
   const [empresas, setEmpresas] = useState([]);
-  const [solicitudesAprobadas, setSolicitudesAprobadas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [empresasUnificadas, setEmpresasUnificadas] = useState([]);
 
-  // Cargar empresas existentes (legacy)
+  // Solo muestra empresas activas y mapea todos los campos reales
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "empresas"), (snapshot) => {
-      const empresasData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        origen: 'legacy',
-        tipo: determinarTipoEmpresa(doc.data())
-      }));
+    const q = query(collection(db, "empresas"), where("estado", "==", "Activa"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const empresasData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          nombre: data.nombre,
+          descripcion: data.descripcion,
+          descripcionCompleta: data.descripcionCompleta,
+          direccion: data.direccion,
+          telefono: data.telefono,
+          email: data.email,
+          sitioWeb: data.web,
+          tipo: data.rubro || data.categoria,
+          destacado: data.destacado || false,
+          rating: data.rating || 0,
+          totalReviews: data.totalReviews || 0,
+          marcas: data.marcas || [],
+          categorias: [data.categoria || data.rubro],
+          imagen: data.logoAsignado ? data.logo : (data.imagenLocal || null),
+          galeria: data.galeria || [],
+          horarios: data.horarios || {},
+          servicios: data.servicios || [],
+          fechaRegistro: data.fechaRegistro,
+          redesSociales: {
+            facebook: data.facebook,
+            instagram: data.instagram,
+            whatsapp: data.whatsapp
+          },
+          contactoAdicional: data.contactoAdicional || {},
+          comuna: data.comuna,
+          region: data.region,
+        };
+      });
       setEmpresas(empresasData);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Cargar solicitudes aprobadas de proveedores
-  useEffect(() => {
-    const q = query(
-      collection(db, "solicitudes_proveedor"),
-      where("estado", "==", "aprobada")
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const solicitudesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        origen: 'nuevo_proveedor',
-        tipo: 'proveedor'
-      }));
-      setSolicitudesAprobadas(prev => [...prev.filter(s => s.origen !== 'nuevo_proveedor'), ...solicitudesData]);
-    });
-    return () => unsubscribe();
-  }, []);
+  // Filtros
+  let empresasFiltradas = empresas;
 
-  // Cargar solicitudes aprobadas de empresas (pymes, etc.)
-  useEffect(() => {
-    const q = query(
-      collection(db, "solicitudes_empresa"),
-      where("estado", "==", "aprobada")
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const solicitudesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        origen: 'nueva_empresa',
-        tipo: doc.data().tipoEmpresa || 'pyme'
-      }));
-      setSolicitudesAprobadas(prev => [...prev.filter(s => s.origen !== 'nueva_empresa'), ...solicitudesData]);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Unificar todas las empresas
-  useEffect(() => {
-    const unificadas = [
-      ...empresas.map(emp => formatearEmpresaLegacy(emp)),
-      ...solicitudesAprobadas.map(sol => formatearEmpresaNueva(sol))
-    ];
-    
-    setEmpresasUnificadas(unificadas);
-    setLoading(false);
-  }, [empresas, solicitudesAprobadas]);
-
-  const determinarTipoEmpresa = (empresa) => {
-    if (empresa.esPyme) return 'pyme';
-    if (empresa.esEmprendimiento) return 'emprendimiento';
-    if (empresa.esTaller) return 'taller';
-    if (empresa.esDistribuidor) return 'distribuidor';
-    return 'proveedor';
-  };
-
-  const formatearEmpresaLegacy = (empresa) => ({
-    id: empresa.id,
-    nombre: empresa.nombre || empresa.nombreEmpresa,
-    descripcion: empresa.descripcion || empresa.giroComercial,
-    direccion: empresa.direccion,
-    comuna: empresa.comuna,
-    region: empresa.region,
-    telefono: empresa.telefono,
-    email: empresa.email,
-    sitioWeb: empresa.sitioWeb || empresa.sitio_web,
-    tipo: empresa.tipo,
-    verificado: empresa.verificado || false,
-    premium: empresa.esPremium || false,
-    rating: empresa.rating || 0,
-    totalReviews: empresa.totalReviews || 0,
-    marcas: empresa.marcas || [],
-    categorias: empresa.categorias || [],
-    imagen: empresa.imagen || empresa.logo,
-    horarios: empresa.horariosAtencion || empresa.horarios,
-    servicios: empresa.serviciosPrincipales || [],
-    origen: 'legacy',
-    fechaRegistro: empresa.fechaRegistro || empresa.fechaCreacion
-  });
-
-  const formatearEmpresaNueva = (solicitud) => ({
-    id: solicitud.id,
-    nombre: solicitud.nombreEmpresa,
-    descripcion: solicitud.giroComercial,
-    direccion: solicitud.direccion,
-    comuna: solicitud.comuna,
-    region: solicitud.region,
-    telefono: solicitud.telefono,
-    email: solicitud.email,
-    sitioWeb: solicitud.sitioWeb,
-    tipo: solicitud.tipo,
-    verificado: true, // Las aprobadas están verificadas
-    premium: false,
-    rating: 0,
-    totalReviews: 0,
-    marcas: solicitud.marcasQueManeja || [],
-    categorias: [solicitud.sectorAutomotriz],
-    imagen: null,
-    horarios: solicitud.horariosAtencion,
-    servicios: solicitud.serviciosPrincipales || [],
-    origen: solicitud.origen,
-    fechaRegistro: solicitud.fechaSolicitud,
-    representante: {
-      nombre: solicitud.nombreRepresentante,
-      cargo: solicitud.cargoRepresentante,
-      telefono: solicitud.telefonoRepresentante,
-      email: solicitud.emailRepresentante
-    },
-    redesSociales: {
-      facebook: solicitud.facebook,
-      instagram: solicitud.instagram,
-      whatsapp: solicitud.whatsapp
-    }
-  });
-
-  // Aplicar filtros
-  let empresasFiltradas = empresasUnificadas.filter(empresa => empresa.nombre);
-
-  // Filtro por tipo
   if (filtroTipo && filtroTipo !== 'todos') {
-    empresasFiltradas = empresasFiltradas.filter(emp => emp.tipo === filtroTipo);
+    empresasFiltradas = empresasFiltradas.filter(emp =>
+      emp.tipo && emp.tipo.toLowerCase() === filtroTipo.toLowerCase()
+    );
   }
 
-  // Filtro por marca
   if (filtroMarca) {
     empresasFiltradas = empresasFiltradas.filter(emp =>
       Array.isArray(emp.marcas) &&
@@ -162,7 +72,6 @@ export default function ListadoEmpresasUnificado({
     );
   }
 
-  // Filtro por categoría
   if (filtroCategoria) {
     empresasFiltradas = empresasFiltradas.filter(emp =>
       Array.isArray(emp.categorias) &&
@@ -170,7 +79,6 @@ export default function ListadoEmpresasUnificado({
     );
   }
 
-  // Filtro por búsqueda
   if (filtroBusqueda && filtroBusqueda.trim() !== "") {
     const q = filtroBusqueda.trim().toLowerCase();
     empresasFiltradas = empresasFiltradas.filter(emp =>
@@ -183,40 +91,12 @@ export default function ListadoEmpresasUnificado({
     );
   }
 
-  // Filtro por ubicación
   if (filtroUbicacion) {
     empresasFiltradas = empresasFiltradas.filter(emp =>
       (emp.comuna && emp.comuna.toLowerCase().includes(filtroUbicacion.toLowerCase())) ||
       (emp.region && emp.region.toLowerCase().includes(filtroUbicacion.toLowerCase()))
     );
   }
-
-  const getTipoBadge = (tipo) => {
-    const badges = {
-      proveedor: { label: 'Proveedor', color: 'bg-blue-100 text-blue-800' },
-      pyme: { label: 'PyME', color: 'bg-green-100 text-green-800' },
-      emprendimiento: { label: 'Emprendimiento', color: 'bg-purple-100 text-purple-800' },
-      taller: { label: 'Taller', color: 'bg-orange-100 text-orange-800' },
-      distribuidor: { label: 'Distribuidor', color: 'bg-indigo-100 text-indigo-800' }
-    };
-    
-    const badge = badges[tipo] || badges.proveedor;
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${badge.color}`}>
-        {badge.label}
-      </span>
-    );
-  };
-
-  const getOrigenBadge = (origen) => {
-    if (origen === 'legacy') return null;
-    
-    return (
-      <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-        Nuevo
-      </span>
-    );
-  };
 
   if (loading) {
     return (
@@ -248,23 +128,21 @@ export default function ListadoEmpresasUnificado({
         <h2 className="text-xl font-semibold text-gray-900">
           {empresasFiltradas.length} {empresasFiltradas.length === 1 ? 'empresa encontrada' : 'empresas encontradas'}
         </h2>
-        
         <div className="flex gap-2">
-          {['todos', 'proveedor', 'pyme', 'emprendimiento', 'taller', 'distribuidor'].map((tipo) => {
-            const count = empresasUnificadas.filter(emp => tipo === 'todos' || emp.tipo === tipo).length;
-            if (count === 0 && tipo !== 'todos') return null;
-            
+          {[...new Set(empresas.map(emp => emp.tipo))].map((tipo) => {
+            const count = empresas.filter(emp => emp.tipo === tipo).length;
+            if (!tipo) return null;
             return (
               <button
                 key={tipo}
-                onClick={() => {}} // Implementar cambio de filtro
+                onClick={() => {}}
                 className={`px-3 py-1 text-sm rounded-full transition-colors ${
                   filtroTipo === tipo
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {tipo === 'todos' ? 'Todas' : tipo.charAt(0).toUpperCase() + tipo.slice(1)} ({count})
+                {tipo.charAt(0).toUpperCase() + tipo.slice(1)} ({count})
               </button>
             );
           })}
@@ -275,15 +153,21 @@ export default function ListadoEmpresasUnificado({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {empresasFiltradas.map((empresa) => (
           <div
-            key={`${empresa.origen}-${empresa.id}`}
+            key={empresa.id}
             className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
             onClick={() => onEmpresaClick && onEmpresaClick(empresa)}
           >
-            {/* Imagen o placeholder */}
+            {/* Imagen principal o logo */}
             <div className="h-48 bg-gradient-to-br from-blue-50 to-purple-50 rounded-t-lg flex items-center justify-center">
               {empresa.imagen ? (
                 <img
                   src={empresa.imagen}
+                  alt={empresa.nombre}
+                  className="w-full h-full object-contain rounded-t-lg"
+                />
+              ) : empresa.galeria && empresa.galeria.length > 0 ? (
+                <img
+                  src={empresa.galeria[0]}
                   alt={empresa.nombre}
                   className="w-full h-full object-cover rounded-t-lg"
                 />
@@ -299,16 +183,12 @@ export default function ListadoEmpresasUnificado({
               {/* Header con badges */}
               <div className="flex justify-between items-start mb-3">
                 <div className="flex gap-2 flex-wrap">
-                  {getTipoBadge(empresa.tipo)}
-                  {getOrigenBadge(empresa.origen)}
-                  {empresa.verificado && (
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                      ✓ Verificado
-                    </span>
-                  )}
-                  {empresa.premium && (
+                  <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    {empresa.tipo}
+                  </span>
+                  {empresa.destacado && (
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                      ⭐ Premium
+                      ⭐ Destacado
                     </span>
                   )}
                 </div>
@@ -352,7 +232,7 @@ export default function ListadoEmpresasUnificado({
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <MapPinIcon className="w-4 h-4 flex-shrink-0" />
                     <span className="truncate">
-                      {empresa.direccion}, {empresa.comuna}
+                      {empresa.direccion}
                     </span>
                   </div>
                 )}
@@ -402,7 +282,6 @@ export default function ListadoEmpresasUnificado({
                 </div>
               )}
 
-              {/* Servicios principales */}
               {empresa.servicios && empresa.servicios.length > 0 && (
                 <div className="mt-3">
                   <p className="text-xs font-medium text-gray-700 mb-2">Servicios:</p>
@@ -424,38 +303,41 @@ export default function ListadoEmpresasUnificado({
                 </div>
               )}
 
-              {/* Footer con acciones */}
-              <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-                <div className="text-xs text-gray-500">
-                  {empresa.fechaRegistro && (
-                    <span>
-                      Desde {new Date(empresa.fechaRegistro.toDate ? empresa.fechaRegistro.toDate() : empresa.fechaRegistro).getFullYear()}
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex gap-2">
-                  {empresa.redesSociales?.whatsapp && (
-                    <a
-                      href={`https://wa.me/${empresa.redesSociales.whatsapp.replace(/[^\d]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 text-sm"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      💬
-                    </a>
-                  )}
-                  {empresa.email && (
-                    <a
-                      href={`mailto:${empresa.email}`}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      ✉️
-                    </a>
-                  )}
-                </div>
+              {/* Redes sociales */}
+              <div className="flex gap-2 mt-4">
+                {empresa.redesSociales?.whatsapp && (
+                  <a
+                    href={`https://wa.me/${empresa.redesSociales.whatsapp.replace(/[^\d]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-800 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    💬
+                  </a>
+                )}
+                {empresa.redesSociales?.facebook && (
+                  <a
+                    href={`https://facebook.com/${empresa.redesSociales.facebook}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    f
+                  </a>
+                )}
+                {empresa.redesSociales?.instagram && (
+                  <a
+                    href={`https://instagram.com/${empresa.redesSociales.instagram}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-600 hover:text-pink-800 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    ig
+                  </a>
+                )}
               </div>
             </div>
           </div>

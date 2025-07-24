@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import ProviderCard from "./ProviderCard";
@@ -11,6 +12,7 @@ export default function ListadoEmpresas({
   onEditar,
   usuario
 }) {
+  const navigate = useNavigate();
   const [empresas, setEmpresas] = useState([]);
   const [advancedFilters, setAdvancedFilters] = useState({});
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -139,8 +141,8 @@ export default function ListadoEmpresas({
     return <div className="text-gray-500 mb-6 text-center">No hay empresas para mostrar.</div>;
 
   const handleViewDetail = (providerId) => {
-    // Implementar vista de detalles del proveedor
-    console.log('Ver detalles del proveedor:', providerId);
+    // Navegar al perfil del proveedor
+    navigate(`/proveedor/${providerId}`);
   };
 
   const handleViewLocation = (providerId) => {

@@ -13,6 +13,7 @@ import LocalProvidersPage from '../pages/LocalProvidersPage';
 import MasInformacionProveedorPage from '../pages/MasInformacionProveedorPage';
 import UserTicketsPage from '../pages/UserTicketsPage';
 import PerfilEmpresaPublica from '../pages/PerfilEmpresaPublica';
+import PerfilEmpresaPublico from '../pages/PerfilEmpresaPublico';
 
 // Servicios públicos
 import ServicioSeguros from '../components/ServicioSeguros';
@@ -57,6 +58,7 @@ const PublicRoutes = () => {
       
       {/* Perfil público de empresas */}
       <Route path="/perfil-empresa/:empresaId" element={<PerfilEmpresaPublica />} />
+      <Route path="/empresa/:empresaId" element={<PerfilEmpresaPublico />} />
       
       {/* Solicitudes públicas */}
       <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />

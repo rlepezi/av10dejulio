@@ -3,7 +3,7 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthState } from "react-firebase-hooks/auth"; // npm i react-firebase-hooks
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,29 +18,156 @@ export default function LoginPage() {
   const params = new URLSearchParams(location.search);
   const tipoLogin = params.get("tipo"); // puede ser "proveedor" o "cliente"
 
+  // Función para verificar si el email corresponde a un agente no registrado
+  const verificarAgenteNoRegistrado = async (email) => {
+    try {
+      const q = query(
+        collection(db, 'agentes'),
+        where('email', '==', email),
+        where('requiere_registro', '==', true)
+      );
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    } catch (error) {
+      console.error('Error verificando agente:', error);
+      return false;
+    }
+  };
+
+  // Función para verificar si el email corresponde a un agente registrado
+  const verificarAgenteRegistrado = async (email) => {
+    try {
+      const q = query(
+        collection(db, 'agentes'),
+        where('email', '==', email),
+        where('requiere_registro', '==', false)
+      );
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    } catch (error) {
+      console.error('Error verificando agente registrado:', error);
+      return false;
+    }
+  };
+
   async function handleLogin(e) {
     e.preventDefault();
     setError("");
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      // Traer el rol desde Firestore (usuarios/{uid})
+      
+      // Verificar el estado del usuario en Firestore antes de permitir el login
       const userDoc = await getDoc(doc(db, "usuarios", cred.user.uid));
-      let rol = "";
+      
       if (userDoc.exists()) {
-        rol = userDoc.data().rol;
-      }
-      // Redirección automática según tipo y rol
-      if (rol === "admin") {
-        navigate("/admin");
-      } else if (rol === "proveedor" || tipoLogin === "proveedor" || tipoUsuario === "proveedor") {
-        navigate("/dashboard/proveedor");
-      } else if (rol === "cliente" || tipoLogin === "cliente" || tipoUsuario === "cliente") {
-        navigate("/dashboard/cliente");
+        const userData = userDoc.data();
+        const rol = userData.rol;
+        const estado = userData.estado;
+        
+        // Verificar si el usuario está en estado pendiente (especialmente agentes)
+        if (estado === 'pendiente_registro') {
+          // Cerrar la sesión inmediatamente para evitar acceso
+          await signOut(auth);
+          
+          if (rol === 'agente') {
+            setError(
+              <div className="text-left">
+                <p className="font-semibold text-red-600 mb-2">❌ Registro pendiente</p>
+                <p className="text-sm mb-3">Tu cuenta de agente fue creada pero aún no has completado el registro inicial.</p>
+                <p className="text-sm text-gray-600 mb-3">Debes usar el proceso de registro antes de poder hacer login.</p>
+                <button
+                  onClick={() => navigate('/registro-agente')}
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                >
+                  Completar Registro de Agente
+                </button>
+              </div>
+            );
+          } else {
+            setError("Tu cuenta está pendiente de activación. Contacta al administrador.");
+          }
+          return;
+        }
+        
+        // Verificar si el usuario está inactivo
+        if (estado === 'inactivo' || (userData.activo === false)) {
+          await signOut(auth);
+          setError("Tu cuenta está desactivada. Contacta al administrador.");
+          return;
+        }
+        
+        // Redirección automática según tipo y rol
+        if (rol === "admin") {
+          navigate("/admin");
+        } else if (rol === "agente") {
+          navigate("/agente");
+        } else if (rol === "proveedor" || tipoLogin === "proveedor" || tipoUsuario === "proveedor") {
+          navigate("/dashboard/proveedor");
+        } else if (rol === "cliente" || tipoLogin === "cliente" || tipoUsuario === "cliente") {
+          navigate("/dashboard/cliente");
+        } else {
+          navigate("/");
+        }
       } else {
-        navigate("/");
+        // Si no existe en usuarios, verificar si es agente pendiente
+        const esAgenteNoRegistrado = await verificarAgenteNoRegistrado(email);
+        
+        if (esAgenteNoRegistrado) {
+          await signOut(auth);
+          setError(
+            <div className="text-left">
+              <p className="font-semibold text-red-600 mb-2">❌ Registro incompleto</p>
+              <p className="text-sm mb-3">Tienes credenciales de agente pero no has completado el registro inicial.</p>
+              <p className="text-sm text-gray-600 mb-3">Debes completar tu registro antes de poder hacer login.</p>
+              <button
+                onClick={() => navigate('/registro-agente')}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                Completar Registro de Agente
+              </button>
+            </div>
+          );
+        } else {
+          await signOut(auth);
+          setError("Usuario no encontrado en el sistema. Contacta al administrador.");
+        }
       }
     } catch (err) {
-      setError("Credenciales incorrectas");
+      console.error('Error en login:', err);
+      
+      // Si es error de usuario no encontrado, verificar si es un agente que necesita registrarse
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        const esAgenteNoRegistrado = await verificarAgenteNoRegistrado(email);
+        const esAgenteRegistrado = await verificarAgenteRegistrado(email);
+        
+        if (esAgenteNoRegistrado) {
+          setError(
+            <div className="text-left">
+              <p className="font-semibold text-blue-600 mb-2">🔑 ¿Eres un agente nuevo?</p>
+              <p className="text-sm mb-3">Tienes credenciales de agente pero no has completado el registro inicial.</p>
+              <p className="text-sm text-gray-600 mb-3">Usa las credenciales que te proporcionó el administrador.</p>
+              <button
+                onClick={() => navigate('/registro-agente')}
+                className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+              >
+                Completar Registro de Agente
+              </button>
+            </div>
+          );
+        } else if (esAgenteRegistrado) {
+          setError(
+            <div className="text-left">
+              <p className="font-semibold text-orange-600 mb-2">🔐 Agente registrado</p>
+              <p className="text-sm mb-3">Eres un agente del sistema pero la contraseña es incorrecta.</p>
+              <p className="text-sm text-gray-600">Verifica tu contraseña o contacta al administrador.</p>
+            </div>
+          );
+        } else {
+          setError("Credenciales incorrectas. Verifica tu email y contraseña.");
+        }
+      } else {
+        setError("Error de conexión. Intenta nuevamente.");
+      }
     }
   }
 
@@ -134,7 +261,7 @@ export default function LoginPage() {
           
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-              {error}
+              {typeof error === 'string' ? error : error}
             </div>
           )}
           
@@ -196,6 +323,32 @@ export default function LoginPage() {
               >
                 🏪 Registro Proveedor
               </button>
+            </div>
+            
+            {/* Opción especial para agentes */}
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="text-sm text-yellow-700 mb-2">
+                <strong>¿Eres un agente de la empresa?</strong>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/registro-agente")}
+                  className="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-700 transition-colors text-sm"
+                >
+                  👤 Registro de Agente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/ayuda-agentes")}
+                  className="bg-yellow-100 text-yellow-700 py-2 px-4 rounded-lg hover:bg-yellow-200 transition-colors text-sm"
+                >
+                  🆘 Ayuda
+                </button>
+              </div>
+              <div className="text-xs text-yellow-600 mt-1">
+                Usa las credenciales proporcionadas por el administrador
+              </div>
             </div>
             
             <button

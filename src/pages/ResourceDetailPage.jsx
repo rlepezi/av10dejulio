@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../firebase';
+import HeaderMenu from '../components/HeaderMenu';
 
 const ResourceDetailPage = () => {
   const { resourceId } = useParams();
@@ -116,6 +117,7 @@ const ResourceDetailPage = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <HeaderMenu />
         <div className="flex justify-center items-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
@@ -126,6 +128,7 @@ const ResourceDetailPage = () => {
   if (error || !resource) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <HeaderMenu />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center">
             <div className="text-6xl mb-4">😕</div>
@@ -146,6 +149,7 @@ const ResourceDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <HeaderMenu />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Navegación */}

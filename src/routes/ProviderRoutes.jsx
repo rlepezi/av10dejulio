@@ -18,7 +18,6 @@ const ProviderRoutes = () => {
       {/* Rutas públicas de registro */}
       <Route path="/registrar-empresa" element={<PostularEmpresaPage />} />
       <Route path="/registro-proveedor" element={<RegistroProveedor />} />
-      <Route path="/registro-pyme" element={<RegistroProveedor />} />
       
       {/* Rutas protegidas de proveedor */}
       <Route

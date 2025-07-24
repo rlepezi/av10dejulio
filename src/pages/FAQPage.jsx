@@ -7,6 +7,7 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import HeaderMenu from '../components/HeaderMenu';
 
 const FAQPage = () => {
   const [faqs, setFaqs] = useState([]);
@@ -141,6 +142,7 @@ const FAQPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <HeaderMenu />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}

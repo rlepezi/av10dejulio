@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import HeaderMenu from '../components/HeaderMenu';
 
 const EducationalResourcesPage = () => {
   const [resources, setResources] = useState([]);
@@ -123,6 +124,7 @@ const EducationalResourcesPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <HeaderMenu />
       
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}

@@ -1,13 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import HeaderMenu from './HeaderMenu';
 
 const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
     <div className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-blue-600 text-white overflow-hidden">
+      {/* Barra de navegación global */}
+      <HeaderMenu />
+      
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-20">
+      <div className="absolute inset-0 opacity-20" style={{ pointerEvents: 'none' }}>
         <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
           <g fill="none" fillRule="evenodd">
             <g fill="#ffffff" fillOpacity="0.05">
@@ -283,10 +287,10 @@ const HeroSection = () => {
 
               <div className="space-y-3">
                 <button
-                  onClick={() => navigate('/registro-pyme')}
+                  onClick={() => navigate('/registro-proveedor')}
                   className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 px-6 rounded-lg font-semibold transition-all transform hover:scale-105"
                 >
-                  � Registrar Mi Empresa
+                  🏢 Registrar Mi Empresa
                 </button>
                 <button
                   onClick={() => navigate('/login?tipo=empresa')}

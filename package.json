@@ -11,6 +11,7 @@
   "dependencies": {
     "@heroicons/react": "^1.0.6",
     "@react-google-maps/api": "^2.20.1",
+    "@tailwindcss/line-clamp": "^0.4.4",
     "dayjs": "^1.11.13",
     "firebase": "^10.7.2",
     "jspdf": "^3.0.1",

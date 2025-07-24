@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import HeaderMenu from '../components/HeaderMenu';
 import ProviderBadges from '../components/ProviderBadges';
 import ProviderReputation from '../components/ProviderReputation';
 
@@ -122,7 +123,13 @@ const PymesLocalesPage = () => {
   };
 
   const isPymeOrEmprendimiento = (provider) => {
-    // Criterios para considerar PyME o emprendimiento
+    // Si existe tipoEmpresa, usarlo como filtro principal
+    if (provider.tipoEmpresa) {
+      // Mostrar todo EXCEPTO proveedores
+      return provider.tipoEmpresa !== 'proveedor';
+    }
+    
+    // Fallback: Criterios legacy para considerar PyME o emprendimiento
     const fechaRegistro = provider.fechaRegistro || provider.fechaCreacion;
     const esNuevo = fechaRegistro && 
       (new Date() - (fechaRegistro.toDate ? fechaRegistro.toDate() : new Date(fechaRegistro))) < (3 * 365 * 24 * 60 * 60 * 1000);
@@ -172,14 +179,21 @@ const PymesLocalesPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-gray-50">
+        <HeaderMenu />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Barra de navegación global */}
+      <HeaderMenu />
+      
+      {/* Contenido principal */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Section - Enfoque en PyMEs y Emprendimientos */}
         <div className="bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 rounded-2xl text-white p-8 mb-8">
@@ -189,40 +203,69 @@ const PymesLocalesPage = () => {
                 ¡PARA PyMEs y EMPRENDEDORES!
               </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              🏪 {providers.length}+ PyMEs y Emprendimientos Locales
+            <h1 className="text-4xl lg:text-5xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                PyMEs Locales
+              </span>
+              <br />
+              <span className="text-2xl lg:text-3xl">Sector Automotriz</span>
             </h1>
-            <p className="text-xl md:text-2xl text-blue-100 mb-6">
-              Vulcanizadoras, talleres mecánicos, lavado de autos y más servicios de barrio
-            </p>
-            <p className="text-lg text-blue-200 max-w-3xl mx-auto mb-8">
-              Conecta con <strong className="text-yellow-400">emprendedores locales</strong> que 
-              ofrecen servicios automotrices de calidad en tu sector. Muchos de ellos están 
-              comenzando su transformación digital y necesitan tu apoyo.
+            <p className="text-xl text-green-100 mb-8">
+              Descubre talleres, vulcanizaciones y servicios especializados en tu zona
             </p>
             
+            {/* Botones de llamada a la acción */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
-                onClick={() => navigate('/registro-pyme')}
-                className="bg-yellow-400 text-blue-900 px-8 py-3 rounded-lg font-semibold hover:bg-yellow-500 transition-colors shadow-lg"
+                onClick={() => navigate('/registro-proveedor')}
+                className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-8 py-3 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 shadow-lg"
               >
-                🚀 Registrar Mi PyME
-              </button>
-              <button
-                onClick={() => navigate('/login?tipo=empresa')}
-                className="bg-white text-blue-700 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors shadow-lg"
-              >
-                🏢 Acceso Empresas
+                📝 Registrar mi PyME
               </button>
               <button
                 onClick={() => {
                   const providersSection = document.getElementById('sectores-pymes');
                   providersSection?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="bg-white/20 text-white px-8 py-3 rounded-lg font-semibold hover:bg-white/30 transition-colors border-2 border-white/30"
+                className="border-2 border-white text-white hover:bg-white hover:text-blue-900 px-8 py-3 rounded-lg font-semibold text-lg transition-all"
               >
                 🔍 Explorar PyMEs
               </button>
+              <button
+                  onClick={() => navigate('/login?tipo=empresa')}
+                  className="bg-white text-blue-700 px-10 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition-colors shadow-xl border-2 border-white"
+                >
+                  🏢 Ya Tengo Cuenta
+                </button>
+            </div>
+          </div>
+        </div>
+        {/* Sección informativa */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              🚀 Impulsa tu negocio automotriz
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Conectamos PyMEs locales con clientes que necesitan servicios automotrices de calidad. 
+              Si tienes un taller, vulcanización o servicio especializado, este es tu espacio.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+              <div className="text-center">
+                <div className="text-3xl mb-2">🏪</div>
+                <h3 className="font-semibold text-gray-800">PyMEs Locales</h3>
+                <p className="text-gray-600 text-sm">Descubre negocios de barrio</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl mb-2">🔧</div>
+                <h3 className="font-semibold text-gray-800">Servicios Especializados</h3>
+                <p className="text-gray-600 text-sm">Talleres, vulcanizaciones y más</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl mb-2">🤝</div>
+                <h3 className="font-semibold text-gray-800">Apoyo al Emprendimiento</h3>
+                <p className="text-gray-600 text-sm">Impulsamos la economía local</p>
+              </div>
             </div>
           </div>
         </div>
@@ -315,7 +358,7 @@ const PymesLocalesPage = () => {
             <div className="text-center mt-8">
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
-                  onClick={() => navigate('/registro-pyme')}
+                  onClick={() => navigate('/registro-proveedor')}
                   className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-10 py-4 rounded-xl font-semibold text-lg hover:from-green-700 hover:to-blue-700 transition-all transform hover:scale-105 shadow-lg"
                 >
                   🚀 Comenzar Mi Transformación Digital
@@ -599,7 +642,7 @@ const PymesLocalesPage = () => {
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
-                  onClick={() => navigate('/registro-pyme')}
+                  onClick={() => navigate('/registro-proveedor')}
                   className="bg-yellow-400 text-blue-900 px-10 py-4 rounded-xl font-bold text-lg hover:bg-yellow-500 transition-colors shadow-xl transform hover:scale-105"
                 >
                   🌟 Registrar Mi PyME Gratis

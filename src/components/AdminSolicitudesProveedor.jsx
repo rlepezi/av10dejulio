@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, query, orderBy, where, addDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, orderBy, where, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { NotificationService } from '../utils/notificationService';
@@ -336,63 +336,46 @@ export default function AdminSolicitudesProveedor() {
       console.log('🔍 Empresa a crear:', nuevaEmpresa);
       console.log('🔍 Representante:', nuevaEmpresa.representante);
 
-      try {
-        const empresaRef = await addDoc(collection(db, 'empresas'), nuevaEmpresa);
-        console.log('✅ Empresa creada exitosamente en colección empresas:', empresaRef.id);
+      const empresaRef = await addDoc(collection(db, 'empresas'), nuevaEmpresa);
+      console.log('✅ Empresa creada en colección empresas:', empresaRef.id);
 
-        // 3. Actualizar la solicitud con el ID de la empresa creada
-        await updateDoc(docRef, {
-          empresa_id: empresaRef.id,
-          empresa_activa: true
-        });
+      // 3. Actualizar la solicitud con el ID de la empresa creada
+      await updateDoc(docRef, {
+        empresa_id: empresaRef.id,
+        empresa_activa: true
+      });
 
-        console.log('✅ Solicitud vinculada con empresa ID:', empresaRef.id);
-        
-        // Verificar que la empresa fue creada correctamente
-        const empresaCreada = await getDoc(doc(db, 'empresas', empresaRef.id));
-        if (empresaCreada.exists()) {
-          console.log('✅ Verificación: Empresa existe en la colección empresas');
-          console.log('📊 Datos de la empresa creada:', empresaCreada.data());
-        } else {
-          console.error('❌ Error: La empresa no se encontró después de la creación');
+      console.log('✅ Solicitud vinculada con empresa');
+      
+      // 4. Enviar notificación de aprobación
+      await NotificationService.createInAppNotification(
+        solicitud.email_representante,
+        'validacion',
+        '¡Felicidades! Tu solicitud de proveedor ha sido aprobada',
+        `${solicitud.nombre_empresa} ya está activo como proveedor en AV10 de Julio y aparece en la lista pública de proveedores.`,
+        {
+          solicitudId: solicitudId,
+          empresaId: empresaRef.id,
+          empresaNombre: solicitud.nombre_empresa,
+          estado: 'aprobada',
+          origen: 'admin_aprobacion_proveedor'
         }
-        
-        // 4. Enviar notificación de aprobación
-        await NotificationService.createInAppNotification(
-          solicitud.email_representante,
-          'validacion',
-          '¡Felicidades! Tu solicitud de proveedor ha sido aprobada',
-          `${solicitud.nombre_empresa} ya está activo como proveedor en AV10 de Julio y aparece en la lista pública de proveedores.`,
-          {
-            solicitudId: solicitudId,
-            empresaId: empresaRef.id,
-            empresaNombre: solicitud.nombre_empresa,
-            estado: 'aprobada',
-            origen: 'admin_aprobacion_proveedor'
-          }
-        );
+      );
 
-        console.log('✅ Notificación enviada');
+      // 5. Actualizar estado local
+      setSolicitudes(prev => prev.map(s => 
+        s.id === solicitudId 
+          ? { 
+              ...s, 
+              estado: 'aprobada', 
+              progreso_porcentaje: 100,
+              empresa_id: empresaRef.id,
+              empresa_activa: true
+            }
+          : s
+      ));
 
-        // 5. Actualizar estado local
-        setSolicitudes(prev => prev.map(s => 
-          s.id === solicitudId 
-            ? { 
-                ...s, 
-                estado: 'aprobada', 
-                progreso_porcentaje: 100,
-                empresa_id: empresaRef.id,
-                empresa_activa: true
-              }
-            : s
-        ));
-
-        alert(`¡Solicitud aprobada exitosamente! ${solicitud.nombre_empresa} ahora aparece como proveedor activo.`);
-        
-      } catch (empresaError) {
-        console.error('❌ Error creando empresa:', empresaError);
-        throw new Error(`Error al crear empresa: ${empresaError.message}`);
-      }
+      alert(`¡Solicitud aprobada exitosamente! ${solicitud.nombre_empresa} ahora aparece como proveedor activo.`);
     } catch (error) {
       console.error('❌ Error approving request:', error);
       alert('Error al aprobar la solicitud: ' + error.message);

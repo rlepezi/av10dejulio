@@ -21,10 +21,23 @@ import RegistroProveedor from "./components/RegistroProveedor";
 import SolicitudComunidad from "./components/SolicitudComunidad";
 import LocalProvidersPage from "./pages/LocalProvidersPage";
 import PymesLocalesPage from "./pages/PymesLocalesPage";
+import AreaClientePage from "./pages/AreaClientePage";
+import FAQPage from "./pages/FAQPage";
+import EducationalResourcesPage from "./pages/EducationalResourcesPage";
+import ResourceDetailPage from "./pages/ResourceDetailPage";
+import ContactPage from "./pages/ContactPage";
+import SegurosPage from "./pages/SegurosPage";
+import RevisionTecnicaPage from "./pages/RevisionTecnicaPage";
+import VulcanizacionesPage from "./pages/VulcanizacionesPage";
+import ReciclajePage from "./pages/ReciclajePage";
+import RecordatoriosPage from "./pages/RecordatoriosPage";
+import MasInformacionProveedorPage from "./pages/MasInformacionProveedorPage";
+import PerfilEmpresaPublica from "./pages/PerfilEmpresaPublica";
 
 // Componentes globales
 import QuickFeedbackWidget from "./components/QuickFeedbackWidget";
 import NotificationManager from "./components/NotificationManager";
+import FirebaseTest from "./components/FirebaseTest";
 
 // Inicialización de datos
 import { initializeServiceData } from "./utils/initializeData";
@@ -111,11 +124,29 @@ function App() {
             
             {/* Rutas críticas para navegación desde HeroSection */}
             <Route path="/registro-cliente" element={<RegistroCliente />} />
-            <Route path="/registro-pyme" element={<RegistroProveedor />} />
             <Route path="/registro-proveedor" element={<RegistroProveedor />} />
             <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />
             <Route path="/proveedores" element={<LocalProvidersPage />} />
             <Route path="/proveedores-locales" element={<PymesLocalesPage />} />
+            <Route path="/area-cliente" element={<AreaClientePage />} />
+            <Route path="/recursos" element={<EducationalResourcesPage />} />
+            <Route path="/recursos/:resourceId" element={<ResourceDetailPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/contacto" element={<ContactPage />} />
+            
+            {/* Rutas de servicios automotrices */}
+            <Route path="/servicios/seguros" element={<SegurosPage />} />
+            <Route path="/servicios/revision-tecnica" element={<RevisionTecnicaPage />} />
+            <Route path="/servicios/vulcanizaciones" element={<VulcanizacionesPage />} />
+            <Route path="/servicios/reciclaje" element={<ReciclajePage />} />
+            <Route path="/mis-recordatorios" element={<RecordatoriosPage />} />
+            
+            {/* Perfil público de proveedor */}
+            <Route path="/proveedor/:id" element={<MasInformacionProveedorPage />} />
+            <Route path="/empresa/:empresaId" element={<PerfilEmpresaPublica />} />
+            
+            {/* Test de Firebase para debug */}
+            <Route path="/firebase-test" element={<FirebaseTest />} />
             
             {/* Ruta catch-all para manejar rutas no encontradas */}
             <Route path="*" element={<HomePage />} />

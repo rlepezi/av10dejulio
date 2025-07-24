@@ -11,28 +11,35 @@ const linksAdmin = [
   { to: "servicios/reciclaje", label: "♻️ Reciclaje", icon: "♻️", section: "servicios" },
   { to: "recordatorios", label: "🔔 Mis Recordatorios", icon: "🔔", section: "servicios" },
   
-  // Administración
-  { to: "empresas", label: "🏢 Gestión de Empresas", icon: "🏢", section: "admin" },
+  // Solicitudes y Gestión de Empresas
+  { to: "solicitudes-registro", label: "📋 Solicitudes de Registro", icon: "📋", section: "admin" },
+  { to: "empresas", label: "🏢 Empresas Registradas", icon: "🏢", section: "admin" },
+  
+  // Gestión de Clientes y Comunidad
+  { to: "solicitudes-cliente", label: "� Solicitudes de Clientes", icon: "�", section: "admin" },
+  { to: "validacion-clientes", label: "✅ Validación de Clientes", icon: "✅", section: "admin" },
+  { to: "solicitudes-comunidad", label: "🤝 Solicitudes de Comunidad", icon: "🤝", section: "admin" },
+  
+  // Configuración del Sistema
   { to: "marcas", label: "🏷️ Gestión de Marcas", icon: "🏷️", section: "admin" },
   { to: "tipos-empresa", label: "🏢 Tipos de Empresa", icon: "🏢", section: "admin" },
-  { to: "categorias", label: "📂 Gestión de Categorías", icon: "📂", section: "admin" },
-  { to: "proveedores", label: "🏪 Gestión de Proveedores", icon: "🏪", section: "admin" },
-  { to: "solicitudes-empresa", label: "📋 Solicitudes de Empresas", icon: "📋", section: "admin" },
-  { to: "solicitudes-cliente", label: "👥 Solicitudes de Clientes", icon: "👥", section: "admin" },
-  { to: "solicitudes-proveedor", label: "🏪 Solicitudes de Proveedores", icon: "🏪", section: "admin" },
-  { to: "solicitudes-comunidad", label: "🤝 Solicitudes de Comunidad", icon: "🤝", section: "admin" },
-  { to: "validacion-clientes", label: "✅ Validación de Clientes", icon: "✅", section: "admin" },
-  { to: "estadisticas", label: "📊 Panel de Estadísticas", icon: "📊", section: "admin" },
+  { to: "categorias", label: "� Gestión de Categorías", icon: "�", section: "admin" },
+  
+  // Moderación y Control
   { to: "moderacion-reseñas", label: "⭐ Moderación Reseñas", icon: "⭐", section: "admin" },
   { to: "gestion-tickets", label: "🎫 Gestión de Tickets", icon: "🎫", section: "admin" },
-  { to: "recursos-educativos", label: "📚 Recursos Educativos", icon: "📚", section: "admin" },
   { to: "notificaciones", label: "📱 Notificaciones Push", icon: "📱", section: "admin" },
+  
+  // Análisis y Configuración
+  { to: "estadisticas", label: "� Panel de Estadísticas", icon: "�", section: "admin" },
+  { to: "recursos-educativos", label: "� Recursos Educativos", icon: "�", section: "admin" },
   { to: "configuracion-sistema", label: "⚙️ Configuración Sistema", icon: "⚙️", section: "admin" },
   
   // Catastro
   { to: "catastro-masivo", label: "📊 Catastro Masivo", icon: "📊", section: "catastro" },
   { to: "panel-validacion", label: "🔍 Panel de Validación", icon: "🔍", section: "catastro" },
   { to: "agentes-campo", label: "👥 Agentes de Campo", icon: "👥", section: "catastro" },
+  { to: "gestion-agentes", label: "🔑 Gestión de Agentes", icon: "🔑", section: "catastro" },
 ];
 
 const linksProveedor = [

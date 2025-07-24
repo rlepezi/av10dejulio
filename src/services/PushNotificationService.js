@@ -42,11 +42,11 @@ class PushNotificationService {
   async registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registrado:', registration);
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Firebase Service Worker registrado:', registration);
         return registration;
       } catch (error) {
-        console.error('Error registrando Service Worker:', error);
+        console.error('Error registrando Firebase Service Worker:', error);
         throw error;
       }
     }

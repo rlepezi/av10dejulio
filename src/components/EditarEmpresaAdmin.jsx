@@ -281,7 +281,8 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
     web: empresa.web || '',
     categoria: empresa.categoria || '',
     descripcion: empresa.descripcion || '',
-    estado: empresa.estado || 'Inactiva'
+    estado: empresa.estado || 'Inactiva',
+    tipoEmpresa: empresa.tipoEmpresa || 'proveedor'
   });
 
   const handleChange = (e) => {
@@ -391,6 +392,25 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
             <option value="Inactiva">Inactiva</option>
             <option value="En Revisión">En Revisión</option>
             <option value="Suspendida">Suspendida</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tipo de Empresa
+          </label>
+          <select
+            name="tipoEmpresa"
+            value={formData.tipoEmpresa}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="proveedor">Proveedor</option>
+            <option value="pyme">PyME</option>
+            <option value="empresa">Empresa</option>
+            <option value="emprendimiento">Emprendimiento</option>
+            <option value="local">Local</option>
+            <option value="premium">Premium</option>
           </select>
         </div>
       </div>

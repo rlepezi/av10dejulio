@@ -14,7 +14,7 @@ export default function DashboardSwitch() {
     } else if (rol === "proveedor") {
       navigate("/dashboard/proveedor");
     } else if (rol === "agente") {
-      navigate("/dashboard/agente");
+      navigate("/agente");
     } else if (rol === "mecanico") {
       navigate("/dashboard/mecanico");
     } else if (rol === "cliente") {

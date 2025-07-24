@@ -5,14 +5,12 @@ import DashboardLayout from "./DashboardLayout";
 // Importar todos los componentes de admin
 import AdminPanel from "./AdminPanel";
 import AdminMarcas from "./AdminMarcas";
-import AdminStoreList from "./AdminStoreList";
+import GestionEmpresas from "./GestionEmpresas";
+import SolicitudesRegistro from "./SolicitudesRegistro";
 import GestionTiposEmpresa from "./GestionTiposEmpresa";
-import ListadoProveedoresAdmin from "./ListadoProveedoresAdmin";
 import ListadoCampañasAdmin from "./ListadoCampañasAdmin";
 import ListadoProductosAdmin from "./ListadoProductosAdmin";
 import AdminSolicitudesCliente from "./AdminSolicitudesCliente";
-import AdminSolicitudesProveedor from "./AdminSolicitudesProveedor";
-import AdminSolicitudesEmpresa from "./AdminSolicitudesEmpresa";
 import AdminSolicitudesComunidad from "./AdminSolicitudesComunidad";
 import AdminNotificaciones from "./AdminNotificaciones";
 import ListadoCategoriasAdmin from "./ListadoCategoriasAdmin";
@@ -21,11 +19,13 @@ import AdminDashboardStats from "./AdminDashboardStats";
 import CatastroMasivo from "./CatastroMasivo";
 import PanelValidacionAvanzado from "./PanelValidacionAvanzado";
 import AgentesCampo from "./AgentesCampo";
+import GestionAgentes from "./GestionAgentes";
 import AdminSetup from "./AdminSetup";
 import ReviewModerationPage from "../pages/ReviewModerationPage";
 import TicketManagementPage from "../pages/TicketManagementPage";
 import ResourceManager from "./ResourceManager";
 import EditarEmpresaAdmin from "./EditarEmpresaAdmin";
+import ListadoProveedoresAdmin from "./ListadoProveedoresAdmin";
 
 // Servicios
 import ServicioSeguros from "./ServicioSeguros";
@@ -49,15 +49,13 @@ export default function AdminLayout() {
         <Route path="recordatorios" element={<SistemaRecordatorios />} />
         
         {/* Administración */}
-        <Route path="empresas" element={<AdminStoreList />} />
+        <Route path="empresas" element={<GestionEmpresas />} />
         <Route path="editar-empresa/:empresaId" element={<EditarEmpresaAdmin />} />
+        <Route path="solicitudes-registro" element={<SolicitudesRegistro />} />
         <Route path="marcas" element={<AdminMarcas />} />
         <Route path="tipos-empresa" element={<GestionTiposEmpresa />} />
         <Route path="categorias" element={<ListadoCategoriasAdmin />} />
-        <Route path="proveedores" element={<ListadoProveedoresAdmin />} />
-        <Route path="solicitudes-empresa" element={<AdminSolicitudesEmpresa />} />
         <Route path="solicitudes-cliente" element={<AdminSolicitudesCliente />} />
-        <Route path="solicitudes-proveedor" element={<AdminSolicitudesProveedor />} />
         <Route path="solicitudes-comunidad" element={<AdminSolicitudesComunidad />} />
         <Route path="notificaciones" element={<AdminNotificaciones />} />
         <Route path="validacion-clientes" element={<AdminValidacionClientes />} />
@@ -71,10 +69,12 @@ export default function AdminLayout() {
         <Route path="catastro-masivo" element={<CatastroMasivo />} />
         <Route path="panel-validacion" element={<PanelValidacionAvanzado />} />
         <Route path="agentes-campo" element={<AgentesCampo />} />
+        <Route path="gestion-agentes" element={<GestionAgentes />} />
         
         {/* Gestión de campañas y productos */}
         <Route path="campañas" element={<ListadoCampañasAdmin />} />
         <Route path="productos" element={<ListadoProductosAdmin />} />
+        <Route path="proveedores" element={<ListadoProveedoresAdmin />} />
       </Routes>
     </DashboardLayout>
   );

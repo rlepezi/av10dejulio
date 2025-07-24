@@ -18,6 +18,7 @@ const AdvancedFilters = ({
     region: '',
     ciudad: '',
     tipoProveedor: '',
+    tipoEmpresa: '',
     verificado: '',
     esLocal: false,
     esPyme: false,
@@ -96,6 +97,7 @@ const AdvancedFilters = ({
       region: '',
       ciudad: '',
       tipoProveedor: '',
+      tipoEmpresa: '',
       verificado: '',
       esLocal: false,
       esPyme: false,
@@ -210,6 +212,26 @@ const AdvancedFilters = ({
             </div>
           )}
 
+          {/* Filtro por Tipo de Empresa */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo de Empresa
+            </label>
+            <select
+              value={filters.tipoEmpresa}
+              onChange={(e) => handleFilterChange('tipoEmpresa', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            >
+              <option value="">Todos los tipos</option>
+              <option value="proveedor">🔧 Proveedor</option>
+              <option value="pyme">⭐ PyME</option>
+              <option value="empresa">🏢 Empresa</option>
+              <option value="emprendimiento">🚀 Emprendimiento</option>
+              <option value="local">📍 Local</option>
+              <option value="premium">💎 Premium</option>
+            </select>
+          </div>
+
           {/* Filtro por Verificación */}
           {showVerificationFilter && (
             <div>
@@ -300,6 +322,16 @@ const AdvancedFilters = ({
                 {filters.tipoProveedor === 'pyme' && '⭐ PyMEs'}
                 {filters.tipoProveedor === 'empresa' && '🏢 Empresas'}
                 {filters.tipoProveedor === 'local' && '📍 Locales'}
+              </span>
+            )}
+            {filters.tipoEmpresa && (
+              <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
+                {filters.tipoEmpresa === 'proveedor' && '🔧 Proveedor'}
+                {filters.tipoEmpresa === 'pyme' && '⭐ PyME'}
+                {filters.tipoEmpresa === 'empresa' && '🏢 Empresa'}
+                {filters.tipoEmpresa === 'emprendimiento' && '🚀 Emprendimiento'}
+                {filters.tipoEmpresa === 'local' && '📍 Local'}
+                {filters.tipoEmpresa === 'premium' && '💎 Premium'}
               </span>
             )}
             {filters.verificado && (

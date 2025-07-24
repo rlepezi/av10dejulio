@@ -170,11 +170,12 @@ function RegistroProveedorSinAuth() {
   const opcionesPaginaWeb = [
     {
       tipo: 'basica',
-      nombre: 'Página Básica',
+      nombre: 'Perfil Básico (Recomendado)',
       precio: '$299.990',
-      descripcion: 'Sitio web simple con información básica de tu empresa',
+      descripcion: 'Perfil empresarial con información relevante de su empresa - OPCIÓN PRESELECCIONADA',
       incluye: [
-        'Página principal con información de contacto',
+        'Perfil empresarial completo',
+        'Información de contacto y ubicación',
         'Galería de servicios básica',
         'Formulario de contacto',
         'Responsive (adaptable a móviles)',
@@ -211,6 +212,19 @@ function RegistroProveedorSinAuth() {
         'SEO avanzado y marketing digital',
         'Soporte prioritario por 6 meses'
       ]
+    },
+    {
+      tipo: 'solicitar_info',
+      nombre: 'Solicitar Información de Otros Planes',
+      precio: 'Consultar',
+      descripcion: 'Quiero recibir información detallada sobre las opciones Intermedia y Completa',
+      incluye: [
+        'Asesoría personalizada gratuita',
+        'Análisis de necesidades específicas',
+        'Propuesta personalizada',
+        'Comparativa detallada de planes',
+        'Sin compromiso de compra'
+      ]
     }
   ];
 
@@ -235,7 +249,11 @@ function RegistroProveedorSinAuth() {
       } else {
         setFormData(prev => ({
           ...prev,
-          [name]: checked
+          [name]: checked,
+          // Si se activa necesita_pagina_web, preseleccionar la opción básica
+          ...(name === 'necesita_pagina_web' && checked && {
+            tipo_pagina_web: 'basica'
+          })
         }));
       }
     } else if (name.startsWith('redes_sociales.')) {
@@ -953,6 +971,20 @@ function RegistroProveedorSinAuth() {
                 Si no tienes página web o quieres mejorar la que tienes, ofrecemos servicios completos de desarrollo web
                 especializados para empresas del sector automotriz.
               </p>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <h4 className="font-semibold text-green-900 mb-2">✨ Perfil Básico Incluido</h4>
+                <p className="text-green-800 text-sm mb-2">
+                  Al registrarte, contarás automáticamente con un <strong>perfil básico</strong> que te permitirá:
+                </p>
+                <ul className="text-green-700 text-sm space-y-1">
+                  <li>• Mostrar información relevante de tu empresa</li>
+                  <li>• Aparecer en los resultados de búsqueda</li>
+                  <li>• Conectar con clientes potenciales</li>
+                  <li>• Gestionar tu presencia online</li>
+                </ul>
+              </div>
+              
               <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-700">
                 <div>
                   <p>✅ Diseño profesional y moderno</p>
@@ -977,17 +1009,26 @@ function RegistroProveedorSinAuth() {
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <label className="text-lg font-medium text-gray-700">
-                  Sí, quiero que me ayuden con una página web
+                  Sí, quiero que me ayuden con una página web (Perfil Básico preseleccionado)
                 </label>
               </div>
 
               {formData.necesita_pagina_web && (
                 <div className="space-y-4 ml-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Elige el plan que mejor se adapte a tu negocio:</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">Opciones disponibles para tu presencia web:</h3>
                   
                   <div className="grid gap-6">
                     {opcionesPaginaWeb.map(opcion => (
-                      <div key={opcion.tipo} className="border border-gray-200 rounded-lg p-6 hover:border-blue-300 transition-colors">
+                      <div 
+                        key={opcion.tipo} 
+                        className={`border rounded-lg p-6 transition-colors ${
+                          opcion.tipo === 'basica' 
+                            ? 'border-green-300 bg-green-50 hover:border-green-400' 
+                            : opcion.tipo === 'solicitar_info'
+                            ? 'border-orange-300 bg-orange-50 hover:border-orange-400'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
                         <label className="flex items-start space-x-3 cursor-pointer">
                           <input
                             type="radio"
@@ -999,13 +1040,42 @@ function RegistroProveedorSinAuth() {
                           />
                           <div className="flex-1">
                             <div className="flex justify-between items-start mb-2">
-                              <h4 className="text-lg font-semibold text-gray-900">{opcion.nombre}</h4>
-                              <span className="text-2xl font-bold text-blue-600">{opcion.precio}</span>
+                              <h4 className={`text-lg font-semibold ${
+                                opcion.tipo === 'basica' ? 'text-green-900' :
+                                opcion.tipo === 'solicitar_info' ? 'text-orange-900' :
+                                'text-gray-900'
+                              }`}>
+                                {opcion.nombre}
+                                {opcion.tipo === 'basica' && (
+                                  <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                                    PRESELECCIONADO
+                                  </span>
+                                )}
+                              </h4>
+                              <span className={`text-2xl font-bold ${
+                                opcion.tipo === 'basica' ? 'text-green-600' :
+                                opcion.tipo === 'solicitar_info' ? 'text-orange-600' :
+                                'text-blue-600'
+                              }`}>
+                                {opcion.precio}
+                              </span>
                             </div>
-                            <p className="text-gray-600 mb-3">{opcion.descripcion}</p>
+                            <p className={`mb-3 ${
+                              opcion.tipo === 'basica' ? 'text-green-700' :
+                              opcion.tipo === 'solicitar_info' ? 'text-orange-700' :
+                              'text-gray-600'
+                            }`}>
+                              {opcion.descripcion}
+                            </p>
                             <div className="grid md:grid-cols-2 gap-1">
                               {opcion.incluye.map((item, index) => (
-                                <p key={index} className="text-sm text-gray-700">✓ {item}</p>
+                                <p key={index} className={`text-sm ${
+                                  opcion.tipo === 'basica' ? 'text-green-700' :
+                                  opcion.tipo === 'solicitar_info' ? 'text-orange-700' :
+                                  'text-gray-700'
+                                }`}>
+                                  ✓ {item}
+                                </p>
                               ))}
                             </div>
                           </div>

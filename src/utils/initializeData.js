@@ -183,12 +183,17 @@ const tiposSeguros = [
 
 export const initializeServiceData = async () => {
   try {
-    console.log('Inicializando datos de servicios...');
+    // Verificar si ya se inicializó hoy
+    const lastInit = localStorage.getItem('lastServiceInit');
+    const today = new Date().toDateString();
+    
+    if (lastInit === today) {
+      return true; // Ya se inicializó hoy
+    }
 
     // Verificar si ya existen datos
     const companiasSnapshot = await getDocs(collection(db, 'companias_seguros'));
     if (companiasSnapshot.empty) {
-      console.log('Agregando compañías de seguros...');
       for (const compania of companiasSeguros) {
         await addDoc(collection(db, 'companias_seguros'), compania);
       }
@@ -196,7 +201,6 @@ export const initializeServiceData = async () => {
 
     const centrosSnapshot = await getDocs(collection(db, 'centros_revision'));
     if (centrosSnapshot.empty) {
-      console.log('Agregando centros de revisión técnica...');
       for (const centro of centrosRevision) {
         await addDoc(collection(db, 'centros_revision'), centro);
       }
@@ -204,7 +208,6 @@ export const initializeServiceData = async () => {
 
     const vulcanizadorasSnapshot = await getDocs(collection(db, 'vulcanizadoras'));
     if (vulcanizadorasSnapshot.empty) {
-      console.log('Agregando vulcanizadoras...');
       for (const vulcanizadora of vulcanizadoras) {
         await addDoc(collection(db, 'vulcanizadoras'), vulcanizadora);
       }
@@ -212,13 +215,13 @@ export const initializeServiceData = async () => {
 
     const tiposSnapshot = await getDocs(collection(db, 'tipos_seguros'));
     if (tiposSnapshot.empty) {
-      console.log('Agregando tipos de seguros...');
       for (const tipo of tiposSeguros) {
         await addDoc(collection(db, 'tipos_seguros'), tipo);
       }
     }
 
-    console.log('Datos de servicios inicializados correctamente');
+    // Marcar como inicializado hoy
+    localStorage.setItem('lastServiceInit', today);
     return true;
   } catch (error) {
     console.error('Error inicializando datos de servicios:', error);
