@@ -8,6 +8,32 @@ import { getRegiones, getComunas } from '../utils/regionesComunas';
 
 // Componente para registro sin autenticación
 function RegistroProveedorSinAuth() {
+  // Valida formato de teléfono chileno: +56XXXXXXXXX (9 dígitos después de +56)
+  function isValidTelefonoEmpresa(telefono) {
+    return /^\+56\d{9}$/.test(telefono);
+  }
+  // Formatea el RUT chileno: 50000000-1, 50000000-K, etc.
+  function formatRut(raw) {
+    let rut = raw.replace(/[^0-9kK]/g, '').toUpperCase();
+    if (rut.length > 9) rut = rut.slice(0, 9);
+    if (rut.length <= 1) return rut;
+    const cuerpo = rut.slice(0, -1);
+    const dv = rut.slice(-1);
+    // Agrega puntos cada 3 dígitos desde la derecha
+    let cuerpoFmt = '';
+    for (let i = cuerpo.length; i > 0; i -= 3) {
+      const start = Math.max(i - 3, 0);
+      cuerpoFmt = (start > 0 ? '.' : '') + cuerpo.slice(start, i) + cuerpoFmt;
+    }
+    return `${cuerpoFmt}-${dv}`;
+  }
+
+  // Valida el formato del RUT chileno (máximo 9 dígitos, último dígito numérico o K)
+  function isValidRut(rut) {
+    const rutClean = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+    if (!/^\d{7,9}[0-9K]$/.test(rutClean)) return false;
+    return true;
+  }
   const navigate = useNavigate();
   const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
@@ -22,18 +48,17 @@ function RegistroProveedorSinAuth() {
     telefono_empresa: '',
     email_empresa: '',
     web_actual: '',
-    
     // Clasificación de empresa
     rubro: '',
     tipoEmpresa: '', // Se determinará según la ruta
-    
     // Información del Representante
     nombres_representante: '',
     apellidos_representante: '',
     cargo_representante: '',
+    fecha_nacimiento_representante: '',
     telefono_representante: '',
     email_representante: '',
-    
+    rut_representante: '',
     // Información del Negocio
     descripcion_negocio: '',
     anos_funcionamiento: '',
@@ -41,7 +66,16 @@ function RegistroProveedorSinAuth() {
     horario_atencion: '',
     categorias_servicios: [],
     marcas_vehiculos: [],
-    
+    // Horarios predefinidos para edición visual
+    horarios: {
+      lunes: { activo: true, inicio: '09:00', fin: '18:00' },
+      martes: { activo: true, inicio: '09:00', fin: '18:00' },
+      miercoles: { activo: true, inicio: '09:00', fin: '18:00' },
+      jueves: { activo: true, inicio: '09:00', fin: '18:00' },
+      viernes: { activo: true, inicio: '09:00', fin: '18:00' },
+      sabado: { activo: true, inicio: '09:00', fin: '14:00' },
+      domingo: { activo: false, inicio: '10:00', fin: '14:00' }
+    },
     // Servicios Web que necesita
     necesita_pagina_web: false,
     tipo_pagina_web: '', // 'basica', 'intermedia', 'completa'
@@ -52,11 +86,9 @@ function RegistroProveedorSinAuth() {
       whatsapp: '',
       tiktok: ''
     },
-    
     // Credenciales para cuenta futura
     password: '',
     confirm_password: '',
-    
     // Términos y condiciones
     acepta_terminos: false,
     acepta_notificaciones: true,
@@ -71,6 +103,22 @@ function RegistroProveedorSinAuth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [solicitudEnviada, setSolicitudEnviada] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState(5);
+
+  // Logo
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  // Manejo de archivo de logo
+  const handleLogoFile = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoFile(file);
+        setLogoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Opciones de rubro para PyMEs
   const rubrosDisponibles = [
@@ -132,12 +180,10 @@ function RegistroProveedorSinAuth() {
   useEffect(() => {
     if (formData.region) {
       setComunasDisponibles(getComunas(formData.region));
-      // Limpiar comuna si no está en la nueva región
-      if (formData.comuna && !getComunas(formData.region).includes(formData.comuna)) {
-        setFormData(prev => ({ ...prev, comuna: '' }));
-      }
+      setFormData(prev => ({ ...prev, comuna: '' }));
     } else {
       setComunasDisponibles([]);
+      setFormData(prev => ({ ...prev, comuna: '' }));
     }
   }, [formData.region]);
 
@@ -170,12 +216,11 @@ function RegistroProveedorSinAuth() {
   const opcionesPaginaWeb = [
     {
       tipo: 'basica',
-      nombre: 'Perfil Básico (Recomendado)',
+      nombre: 'Página Básica',
       precio: '$299.990',
-      descripcion: 'Perfil empresarial con información relevante de su empresa - OPCIÓN PRESELECCIONADA',
+      descripcion: 'Sitio web simple con información básica de tu empresa',
       incluye: [
-        'Perfil empresarial completo',
-        'Información de contacto y ubicación',
+        'Página principal con información de contacto',
         'Galería de servicios básica',
         'Formulario de contacto',
         'Responsive (adaptable a móviles)',
@@ -212,19 +257,6 @@ function RegistroProveedorSinAuth() {
         'SEO avanzado y marketing digital',
         'Soporte prioritario por 6 meses'
       ]
-    },
-    {
-      tipo: 'solicitar_info',
-      nombre: 'Solicitar Información de Otros Planes',
-      precio: 'Consultar',
-      descripcion: 'Quiero recibir información detallada sobre las opciones Intermedia y Completa',
-      incluye: [
-        'Asesoría personalizada gratuita',
-        'Análisis de necesidades específicas',
-        'Propuesta personalizada',
-        'Comparativa detallada de planes',
-        'Sin compromiso de compra'
-      ]
     }
   ];
 
@@ -249,11 +281,7 @@ function RegistroProveedorSinAuth() {
       } else {
         setFormData(prev => ({
           ...prev,
-          [name]: checked,
-          // Si se activa necesita_pagina_web, preseleccionar la opción básica
-          ...(name === 'necesita_pagina_web' && checked && {
-            tipo_pagina_web: 'basica'
-          })
+          [name]: checked
         }));
       }
     } else if (name.startsWith('redes_sociales.')) {
@@ -265,13 +293,24 @@ function RegistroProveedorSinAuth() {
           [redSocial]: value
         }
       }));
+    } else if (name === 'rut_empresa' || name === 'rut_representante') {
+      setFormData(prev => ({
+        ...prev,
+        [name]: formatRut(value)
+      }));
+    } else if (name === 'telefono_empresa' || name === 'telefono_representante') {
+      // Solo permitir +56 y hasta 9 dígitos adicionales
+      let val = value.replace(/[^\d]/g, '');
+      if (val.startsWith('56')) val = val.slice(2);
+      val = val.slice(0, 9);
+      const newValue = '+56' + val;
+      setFormData(prev => ({ ...prev, [name]: newValue }));
     } else {
       setFormData(prev => ({
         ...prev,
         [name]: value
       }));
     }
-    
     // Limpiar error cuando el usuario empiece a escribir
     if (errors[name]) {
       setErrors(prev => ({
@@ -288,8 +327,18 @@ function RegistroProveedorSinAuth() {
       // Información de la empresa
       if (!formData.nombre_empresa.trim()) newErrors.nombre_empresa = 'El nombre de la empresa es obligatorio';
       if (!formData.rut_empresa.trim()) newErrors.rut_empresa = 'El RUT de la empresa es obligatorio';
+      else if (!isValidRut(formData.rut_empresa)) newErrors.rut_empresa = 'RUT inválido. Debe tener hasta 9 dígitos y terminar en número o K';
+      else {
+        // Validar que el RUT empresa sea mayor a 50.000.000
+        const rutClean = formData.rut_empresa.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+        const cuerpo = parseInt(rutClean.slice(0, -1), 10);
+        if (isNaN(cuerpo) || cuerpo <= 50000000) {
+          newErrors.rut_empresa = 'El RUT de la empresa debe ser mayor a 50.000.000';
+        }
+      }
       if (!formData.direccion_empresa.trim()) newErrors.direccion_empresa = 'La dirección es obligatoria';
       if (!formData.telefono_empresa.trim()) newErrors.telefono_empresa = 'El teléfono es obligatorio';
+      else if (!isValidTelefonoEmpresa(formData.telefono_empresa)) newErrors.telefono_empresa = 'Debe ingresar +56 seguido de 9 dígitos (ej: +56912345678)';
       if (!formData.email_empresa.trim()) newErrors.email_empresa = 'El email de la empresa es obligatorio';
       if (!formData.rubro.trim()) newErrors.rubro = 'El rubro específico es obligatorio';
       if (formData.email_empresa && !/\S+@\S+\.\S+/.test(formData.email_empresa)) {
@@ -299,15 +348,37 @@ function RegistroProveedorSinAuth() {
       // Información del representante
       if (!formData.nombres_representante.trim()) newErrors.nombres_representante = 'Los nombres del representante son obligatorios';
       if (!formData.apellidos_representante.trim()) newErrors.apellidos_representante = 'Los apellidos del representante son obligatorios';
+      if (!formData.rut_representante || !formData.rut_representante.trim()) {
+        newErrors.rut_representante = 'El RUT del representante es obligatorio';
+      } else if (!isValidRut(formData.rut_representante)) {
+        newErrors.rut_representante = 'RUT inválido. Debe tener hasta 9 dígitos y terminar en número o K';
+      } else {
+        // Validar que el RUT representante sea menor a 50.000.000
+        const rutClean = formData.rut_representante.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+        const cuerpo = parseInt(rutClean.slice(0, -1), 10);
+        if (isNaN(cuerpo) || cuerpo >= 50000000) {
+          newErrors.rut_representante = 'El RUT del representante debe ser menor a 50.000.000';
+        }
+      }
       if (!formData.email_representante.trim()) newErrors.email_representante = 'El email del representante es obligatorio';
       if (formData.email_representante && !/\S+@\S+\.\S+/.test(formData.email_representante)) {
         newErrors.email_representante = 'El email no es válido';
+      }
+      // Validación de teléfono del representante (opcional, pero si se ingresa debe ser válido)
+      if (formData.telefono_representante && formData.telefono_representante.trim()) {
+        if (!isValidTelefonoEmpresa(formData.telefono_representante)) {
+          newErrors.telefono_representante = 'Debe ingresar +56 seguido de 9 dígitos (ej: +56912345678)';
+        }
       }
     } else if (currentStep === 3) {
       // Información del negocio
       if (!formData.descripcion_negocio.trim()) newErrors.descripcion_negocio = 'La descripción del negocio es obligatoria';
       if (!formData.anos_funcionamiento) newErrors.anos_funcionamiento = 'Los años de funcionamiento son obligatorios';
-      if (!formData.horario_atencion.trim()) newErrors.horario_atencion = 'El horario de atención es obligatorio';
+      // Validación de horario: al menos un día activo y con horas válidas
+      const horarios = formData.horarios || {};
+      const diasActivos = Object.values(horarios).filter(h => h.activo);
+      const horarioValido = diasActivos.length > 0 && diasActivos.every(h => h.inicio && h.fin);
+      if (!horarioValido) newErrors.horario_atencion = 'Debes ingresar al menos un día activo y sus horas de inicio/fin';
       if (formData.categorias_servicios.length === 0) newErrors.categorias_servicios = 'Selecciona al menos una categoría de servicio';
       if (formData.marcas_vehiculos.length === 0) newErrors.marcas_vehiculos = 'Selecciona al menos una marca de vehículo';
     } else if (currentStep === 4) {
@@ -328,8 +399,22 @@ function RegistroProveedorSinAuth() {
   };
 
   const handleNextStep = () => {
-    if (validateStep()) {
+    // Forzar re-render y debug visual
+    const valid = validateStep();
+    if (valid) {
       setCurrentStep(prev => prev + 1);
+    } else {
+      // Debug: mostrar errores en consola
+      console.log('Errores de validación:', errors);
+      // Forzar scroll al primer error visible
+      setTimeout(() => {
+        const errorElem = document.querySelector('.text-red-500');
+        if (errorElem) {
+          errorElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      // Forzar actualización de estado para mostrar errores
+      setErrors(e => ({ ...e }));
     }
   };
 
@@ -339,13 +424,10 @@ function RegistroProveedorSinAuth() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateStep()) {
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       // Verificar si el email ya existe
       const emailQuery = query(
@@ -353,28 +435,96 @@ function RegistroProveedorSinAuth() {
         where('email_empresa', '==', formData.email_empresa)
       );
       const emailSnapshot = await getDocs(emailQuery);
-      
       if (!emailSnapshot.empty) {
         setErrors({ email_empresa: 'Ya existe una solicitud con este email de empresa' });
         setIsSubmitting(false);
         return;
       }
-
-      // Crear solicitud de proveedor sin autenticación
-      const { password, confirm_password, ...dataWithoutPasswords } = formData;
-      
+      // Procesar logo
+      let logoData = null;
+      if (logoPreview) {
+        logoData = logoPreview;
+      }
+      // Crear solicitud con estructura extendida
       const solicitudData = {
-        ...dataWithoutPasswords,
-        
-        fecha_solicitud: new Date(),
-        
-        // Estados de la solicitud
-        estado: 'pendiente', // pendiente, en_revision, validacion_documentos, visita_programada, aprobada, rechazada
-        etapa_actual: 'revision_inicial',
-        progreso_porcentaje: 15,
-        
-        // Seguimiento de etapas específicas para proveedores
-        etapas: {
+        // Campos principales
+        nombre: formData.nombre_empresa,
+        rut: formData.rut_empresa,
+        direccion: formData.direccion_empresa,
+        comuna: formData.comuna,
+        ciudad: formData.ciudad,
+        region: formData.region,
+        telefono: formData.telefono_empresa,
+        email: formData.email_empresa,
+        web: formData.web_actual,
+        categoria: formData.rubro,
+        tipoEmpresa: formData.tipoEmpresa,
+        destacado: false,
+        perfilCompleto: false,
+        estado: 'pendiente',
+        etapa_proceso: 'revision_inicial',
+        fecha_registro: new Date(),
+        fecha_actualizacion: new Date(),
+        fecha_ultima_actualizacion: new Date(),
+        fecha_activacion: null,
+        comentario_admin: '',
+        admin_activador: null,
+        admin_responsable: 'admin@av10dejulio.cl',
+        contactoAdicional: '',
+        solicitud_origen_id: null,
+        // Subobjetos
+        representante: {
+          nombre: formData.nombres_representante,
+          apellidos: formData.apellidos_representante,
+          cargo: formData.cargo_representante,
+          email: formData.email_representante,
+          telefono: formData.telefono_representante,
+          rut_representante: formData.rut_representante
+        },
+        datos_solicitud: {
+          acepta_terminos: formData.acepta_terminos,
+          acepta_notificaciones: formData.acepta_notificaciones,
+          acepta_visita_agente: formData.acepta_visita_campo,
+          necesita_pagina_web: formData.necesita_pagina_web,
+          tipo_pagina_web: formData.tipo_pagina_web,
+          tiene_redes_sociales: formData.tiene_redes_sociales,
+          anos_funcionamiento: formData.anos_funcionamiento,
+          numero_empleados: formData.numero_empleados,
+          password_hash: btoa(formData.password),
+          redes_sociales: formData.redes_sociales,
+          descripcion: formData.descripcion_negocio,
+          descripcionCompleta: formData.descripcion_negocio,
+          galeria_files_data: [],
+          logo_file_data: logoData,
+          rut_representante: formData.rut_representante,
+          rubro: formData.rubro
+        },
+        servicios: formData.categorias_servicios,
+        marcas: formData.marcas_vehiculos,
+        horarios: {
+          lunes: { activo: true, inicio: '09:00', fin: '18:00' },
+          martes: { activo: true, inicio: '09:00', fin: '18:00' },
+          miercoles: { activo: true, inicio: '09:00', fin: '18:00' },
+          jueves: { activo: true, inicio: '09:00', fin: '18:00' },
+          viernes: { activo: true, inicio: '09:00', fin: '18:00' },
+          sabado: { activo: false, inicio: '09:00', fin: '13:00' },
+          domingo: { activo: false, inicio: '10:00', fin: '14:00' }
+        },
+        imagenLocal: '',
+        logo: '',
+        logoAsignado: false,
+        tiene_credenciales_asignadas: false,
+        usuario_empresa: null,
+        webValidada: false,
+        galeria: [],
+        metadatos: {
+          ip_registro: window.location.hostname,
+          user_agent: navigator.userAgent,
+          referencia: 'web_directa',
+          tipo_registro: 'proveedor_sin_auth',
+          timestamp: new Date().toISOString()
+        },
+        etapas_proceso: {
           revision_inicial: {
             estado: 'pendiente',
             fecha_inicio: new Date(),
@@ -412,40 +562,10 @@ function RegistroProveedorSinAuth() {
             comentarios: '',
             responsable: null
           }
-        },
-        
-        // Información adicional para proveedores
-        documentos_adjuntos: [],
-        notas_admin: '',
-        agente_campo_asignado: null,
-        fecha_visita_programada: null,
-        resultado_visita: null,
-        fotos_establecimiento: [],
-        verificacion_ubicacion: false,
-        calificacion_inicial: null,
-        
-        // Servicios adicionales
-        servicios_adicionales: {
-          necesita_pagina_web: formData.necesita_pagina_web,
-          tipo_pagina_web: formData.tipo_pagina_web,
-          estado_servicio_web: formData.necesita_pagina_web ? 'solicitado' : 'no_aplica',
-          presupuesto_web_enviado: false,
-          fecha_inicio_desarrollo: null
-        },
-        
-        // Metadatos
-        ip_registro: window.location.hostname,
-        user_agent: navigator.userAgent,
-        referencia: 'web_directa',
-        tipo_registro: 'sin_auth_proveedor',
-        
-        // Guardar contraseña encriptada para creación posterior de cuenta
-        password_hash: btoa(password) // Base64 simple, en producción usar hash seguro
+        }
       };
-
       const docRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudData);
-      
-      // Enviar notificación al admin
+      // Notificación admin
       await NotificationService.createInAppNotification(
         'admin',
         'validacion',
@@ -462,10 +582,8 @@ function RegistroProveedorSinAuth() {
           origen: 'registro_proveedor'
         }
       );
-
       setSolicitudEnviada(true);
-      
-      // Iniciar cuenta regresiva para redirigir al home principal
+      // Redirección
       const countdownInterval = setInterval(() => {
         setRedirectCountdown(prev => {
           if (prev <= 1) {
@@ -476,7 +594,6 @@ function RegistroProveedorSinAuth() {
           return prev - 1;
         });
       }, 1000);
-      
     } catch (error) {
       console.error('Error creating provider request:', error);
       alert('Error al enviar la solicitud. Por favor, intenta nuevamente.');
@@ -599,7 +716,7 @@ function RegistroProveedorSinAuth() {
                   className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.rut_empresa ? 'border-red-500' : 'border-gray-300'
                   }`}
-                  placeholder="12.345.678-9"
+                  placeholder="50.000.000-1"
                 />
                 {errors.rut_empresa && <p className="text-red-500 text-sm mt-1">{errors.rut_empresa}</p>}
               </div>
@@ -620,18 +737,6 @@ function RegistroProveedorSinAuth() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Comuna *</label>
-                <input
-                  type="text"
-                  name="comuna"
-                  value={formData.comuna}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Comuna del establecimiento"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Región *</label>
                 <select
                   name="region"
@@ -639,8 +744,24 @@ function RegistroProveedorSinAuth() {
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {regiones.map(region => (
+                  <option value="">Selecciona una región</option>
+                  {regionesDisponibles.map(region => (
                     <option key={region} value={region}>{region}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comuna *</label>
+                <select
+                  name="comuna"
+                  value={formData.comuna}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!formData.region}
+                >
+                  <option value="">{formData.region ? 'Selecciona una comuna' : 'Selecciona primero una región'}</option>
+                  {comunasDisponibles.map(comuna => (
+                    <option key={comuna} value={comuna}>{comuna}</option>
                   ))}
                 </select>
               </div>
@@ -688,6 +809,34 @@ function RegistroProveedorSinAuth() {
                 <p className="text-sm text-gray-500 mt-1">
                   Si no tienes página web, ¡no te preocupes! Te ayudamos a crear una en los siguientes pasos.
                 </p>
+              </div>
+
+              {/* Logo de la empresa */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Logo de la Empresa (opcional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoFile}
+                  className="block w-full md:w-auto text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {logoPreview && (
+                  <div className="mt-3 flex items-center gap-4">
+                    <img
+                      src={logoPreview}
+                      alt="Logo preview"
+                      className="w-24 h-24 object-contain border rounded-lg bg-white shadow"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                      className="text-red-600 hover:underline text-sm"
+                    >
+                      Quitar logo
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Puedes subir un logo en formato PNG, JPG o SVG.</p>
               </div>
 
               <div>
@@ -763,7 +912,6 @@ function RegistroProveedorSinAuth() {
         {currentStep === 2 && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Información del Representante</h2>
-            
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Nombres del Representante *</label>
@@ -772,14 +920,11 @@ function RegistroProveedorSinAuth() {
                   name="nombres_representante"
                   value={formData.nombres_representante}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.nombres_representante ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.nombres_representante ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="Nombres del propietario o gerente"
                 />
                 {errors.nombres_representante && <p className="text-red-500 text-sm mt-1">{errors.nombres_representante}</p>}
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Apellidos del Representante *</label>
                 <input
@@ -787,54 +932,59 @@ function RegistroProveedorSinAuth() {
                   name="apellidos_representante"
                   value={formData.apellidos_representante}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.apellidos_representante ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.apellidos_representante ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="Apellidos del propietario o gerente"
                 />
                 {errors.apellidos_representante && <p className="text-red-500 text-sm mt-1">{errors.apellidos_representante}</p>}
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cargo en la Empresa</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">RUT del Representante *</label>
+                <input
+                  type="text"
+                  name="rut_representante"
+                  value={formData.rut_representante}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.rut_representante ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="12.345.678-9"
+                />
+                {errors.rut_representante && <p className="text-red-500 text-sm mt-1">{errors.rut_representante}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cargo del Representante</label>
                 <input
                   type="text"
                   name="cargo_representante"
                   value={formData.cargo_representante}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ej: Propietario, Gerente General, etc."
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                  placeholder="Ej: Gerente, Dueño, Administrador"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono Personal</label>
-                <input
-                  type="tel"
-                  name="telefono_representante"
-                  value={formData.telefono_representante}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="+56 9 1234 5678"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Personal del Representante *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email del Representante *</label>
                 <input
                   type="email"
                   name="email_representante"
                   value={formData.email_representante}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.email_representante ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="tu.email@personal.com"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email_representante ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="email@representante.com"
                 />
                 {errors.email_representante && <p className="text-red-500 text-sm mt-1">{errors.email_representante}</p>}
-                <p className="text-sm text-gray-500 mt-1">
-                  Este email se usará para notificaciones importantes y comunicación directa contigo.
-                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono del Representante</label>
+                <input
+                  type="tel"
+                  name="telefono_representante"
+                  value={formData.telefono_representante}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.telefono_representante ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="+56 9 123456789"
+                  maxLength={12}
+                />
+                <p className="text-xs text-gray-500 mt-1">Ejemplo: +56912345678</p>
+                {errors.telefono_representante && <p className="text-red-500 text-sm mt-1">{errors.telefono_representante}</p>}
               </div>
             </div>
           </div>
@@ -844,114 +994,187 @@ function RegistroProveedorSinAuth() {
         {currentStep === 3 && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Información del Negocio</h2>
-            
-            <div className="space-y-6">
-              <div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Descripción del Negocio *</label>
                 <textarea
                   name="descripcion_negocio"
                   value={formData.descripcion_negocio}
                   onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.descripcion_negocio ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Describe brevemente tu negocio, servicios, experiencia, etc."
                   rows={4}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.descripcion_negocio ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="Describe qué servicios ofreces, tu especialidad y qué te hace único en el mercado..."
                 />
                 {errors.descripcion_negocio && <p className="text-red-500 text-sm mt-1">{errors.descripcion_negocio}</p>}
               </div>
-
-              <div className="grid md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Años de Funcionamiento *</label>
-                  <select
-                    name="anos_funcionamiento"
-                    value={formData.anos_funcionamiento}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.anos_funcionamiento ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  >
-                    <option value="">Selecciona</option>
-                    <option value="menos_1">Menos de 1 año</option>
-                    <option value="1_3">1-3 años</option>
-                    <option value="3_5">3-5 años</option>
-                    <option value="5_10">5-10 años</option>
-                    <option value="mas_10">Más de 10 años</option>
-                  </select>
-                  {errors.anos_funcionamiento && <p className="text-red-500 text-sm mt-1">{errors.anos_funcionamiento}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Número de Empleados</label>
-                  <select
-                    name="numero_empleados"
-                    value={formData.numero_empleados}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Selecciona</option>
-                    <option value="1">Solo yo</option>
-                    <option value="2_5">2-5 empleados</option>
-                    <option value="6_10">6-10 empleados</option>
-                    <option value="11_20">11-20 empleados</option>
-                    <option value="mas_20">Más de 20 empleados</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Horario de Atención *</label>
-                  <input
-                    type="text"
-                    name="horario_atencion"
-                    value={formData.horario_atencion}
-                    onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.horario_atencion ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Ej: Lun-Vie 8:00-18:00"
-                  />
-                  {errors.horario_atencion && <p className="text-red-500 text-sm mt-1">{errors.horario_atencion}</p>}
-                </div>
-              </div>
-
-              {/* Categorías de Servicios */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Categorías de Servicios que Ofreces *</label>
-                <div className="grid md:grid-cols-3 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                  {categoriasDisponibles.map(categoria => (
-                    <label key={categoria} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        name="categorias_servicios"
-                        value={categoria}
-                        checked={formData.categorias_servicios.includes(categoria)}
-                        onChange={handleInputChange}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{categoria}</span>
-                    </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Años de Funcionamiento *</label>
+                <select
+                  name="anos_funcionamiento"
+                  value={formData.anos_funcionamiento}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.anos_funcionamiento ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Selecciona una opción</option>
+                  <option value="0-1">0 a 1 año</option>
+                  <option value="1-3">1 a 3 años</option>
+                  <option value="3-5">3 a 5 años</option>
+                  <option value="5-10">5 a 10 años</option>
+                  <option value="10-20">10 a 20 años</option>
+                  <option value=">20">Más de 20 años</option>
+                </select>
+                {errors.anos_funcionamiento && <p className="text-red-500 text-sm mt-1">{errors.anos_funcionamiento}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número de Empleados</label>
+                <select
+                  name="numero_empleados"
+                  value={formData.numero_empleados}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                >
+                  <option value="">Selecciona una opción</option>
+                  <option value="1-5">1 a 5</option>
+                  <option value="6-10">6 a 10</option>
+                  <option value="11-20">11 a 20</option>
+                  <option value="21-50">21 a 50</option>
+                  <option value="51-100">51 a 100</option>
+                  <option value=">100">Más de 100</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Horario de Atención *</label>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border rounded-lg bg-white">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Día</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Activo</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Hora Inicio</th>
+                        <th className="px-2 py-2 text-left text-xs font-semibold text-gray-700">Hora Fin</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { key: 'lunes', label: 'Lunes' },
+                        { key: 'martes', label: 'Martes' },
+                        { key: 'miercoles', label: 'Miércoles' },
+                        { key: 'jueves', label: 'Jueves' },
+                        { key: 'viernes', label: 'Viernes' },
+                        { key: 'sabado', label: 'Sábado' },
+                        { key: 'domingo', label: 'Domingo' },
+                      ].map(({ key, label }) => (
+                        <tr key={key} className="border-t">
+                          <td className="px-2 py-2 text-sm text-gray-700">{label}</td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="checkbox"
+                              checked={formData.horarios?.[key]?.activo || false}
+                              onChange={e => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [key]: {
+                                      ...prev.horarios?.[key],
+                                      activo: e.target.checked
+                                    }
+                                  }
+                                }));
+                              }}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="time"
+                              value={formData.horarios?.[key]?.inicio || ''}
+                              disabled={!formData.horarios?.[key]?.activo}
+                              onChange={e => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [key]: {
+                                      ...prev.horarios?.[key],
+                                      inicio: e.target.value
+                                    }
+                                  }
+                                }));
+                              }}
+                              className="w-28 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="time"
+                              value={formData.horarios?.[key]?.fin || ''}
+                              disabled={!formData.horarios?.[key]?.activo}
+                              onChange={e => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  horarios: {
+                                    ...prev.horarios,
+                                    [key]: {
+                                      ...prev.horarios?.[key],
+                                      fin: e.target.value
+                                    }
+                                  }
+                                }));
+                              }}
+                              className="w-28 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Activa los días y selecciona el horario de atención para cada uno.</p>
+                {errors.horario_atencion && <p className="text-red-500 text-sm mt-1">{errors.horario_atencion}</p>}
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Categorías de Servicios que Ofreces *</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {categoriasDisponibles.map(cat => (
+                    <span
+                      key={cat}
+                      className={`px-3 py-2 rounded-full border text-sm cursor-pointer select-none transition-colors shadow-sm ${formData.categorias_servicios.includes(cat) ? 'bg-blue-600 text-white border-blue-600 font-semibold' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          categorias_servicios: prev.categorias_servicios.includes(cat)
+                            ? prev.categorias_servicios.filter(c => c !== cat)
+                            : [...prev.categorias_servicios, cat]
+                        }));
+                        if (errors.categorias_servicios) setErrors(prev => ({ ...prev, categorias_servicios: '' }));
+                      }}
+                    >
+                      {formData.categorias_servicios.includes(cat) ? '✓ ' : '+ '}{cat}
+                    </span>
                   ))}
                 </div>
                 {errors.categorias_servicios && <p className="text-red-500 text-sm mt-1">{errors.categorias_servicios}</p>}
               </div>
-
-              {/* Marcas de Vehículos */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Marcas de Vehículos que Atiendes *</label>
-                <div className="grid md:grid-cols-4 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Marcas de Vehículos que Atiendes *</label>
+                <div className="flex flex-wrap gap-2 mb-2">
                   {marcasDisponibles.map(marca => (
-                    <label key={marca} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        name="marcas_vehiculos"
-                        value={marca}
-                        checked={formData.marcas_vehiculos.includes(marca)}
-                        onChange={handleInputChange}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{marca}</span>
-                    </label>
+                    <span
+                      key={marca}
+                      className={`px-3 py-2 rounded-full border text-sm cursor-pointer select-none transition-colors shadow-sm ${formData.marcas_vehiculos.includes(marca) ? 'bg-green-600 text-white border-green-600 font-semibold' : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'}`}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          marcas_vehiculos: prev.marcas_vehiculos.includes(marca)
+                            ? prev.marcas_vehiculos.filter(m => m !== marca)
+                            : [...prev.marcas_vehiculos, marca]
+                        }));
+                        if (errors.marcas_vehiculos) setErrors(prev => ({ ...prev, marcas_vehiculos: '' }));
+                      }}
+                    >
+                      {formData.marcas_vehiculos.includes(marca) ? '✓ ' : '+ '}{marca}
+                    </span>
                   ))}
                 </div>
                 {errors.marcas_vehiculos && <p className="text-red-500 text-sm mt-1">{errors.marcas_vehiculos}</p>}
@@ -971,20 +1194,6 @@ function RegistroProveedorSinAuth() {
                 Si no tienes página web o quieres mejorar la que tienes, ofrecemos servicios completos de desarrollo web
                 especializados para empresas del sector automotriz.
               </p>
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <h4 className="font-semibold text-green-900 mb-2">✨ Perfil Básico Incluido</h4>
-                <p className="text-green-800 text-sm mb-2">
-                  Al registrarte, contarás automáticamente con un <strong>perfil básico</strong> que te permitirá:
-                </p>
-                <ul className="text-green-700 text-sm space-y-1">
-                  <li>• Mostrar información relevante de tu empresa</li>
-                  <li>• Aparecer en los resultados de búsqueda</li>
-                  <li>• Conectar con clientes potenciales</li>
-                  <li>• Gestionar tu presencia online</li>
-                </ul>
-              </div>
-              
               <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-700">
                 <div>
                   <p>✅ Diseño profesional y moderno</p>
@@ -1009,26 +1218,17 @@ function RegistroProveedorSinAuth() {
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <label className="text-lg font-medium text-gray-700">
-                  Sí, quiero que me ayuden con una página web (Perfil Básico preseleccionado)
+                  Sí, quiero que me ayuden con una página web
                 </label>
               </div>
 
               {formData.necesita_pagina_web && (
                 <div className="space-y-4 ml-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">Opciones disponibles para tu presencia web:</h3>
+                  <h3 className="font-semibold text-gray-900 mb-4">Elige el plan que mejor se adapte a tu negocio:</h3>
                   
                   <div className="grid gap-6">
                     {opcionesPaginaWeb.map(opcion => (
-                      <div 
-                        key={opcion.tipo} 
-                        className={`border rounded-lg p-6 transition-colors ${
-                          opcion.tipo === 'basica' 
-                            ? 'border-green-300 bg-green-50 hover:border-green-400' 
-                            : opcion.tipo === 'solicitar_info'
-                            ? 'border-orange-300 bg-orange-50 hover:border-orange-400'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
+                      <div key={opcion.tipo} className="border border-gray-200 rounded-lg p-6 hover:border-blue-300 transition-colors">
                         <label className="flex items-start space-x-3 cursor-pointer">
                           <input
                             type="radio"
@@ -1040,42 +1240,13 @@ function RegistroProveedorSinAuth() {
                           />
                           <div className="flex-1">
                             <div className="flex justify-between items-start mb-2">
-                              <h4 className={`text-lg font-semibold ${
-                                opcion.tipo === 'basica' ? 'text-green-900' :
-                                opcion.tipo === 'solicitar_info' ? 'text-orange-900' :
-                                'text-gray-900'
-                              }`}>
-                                {opcion.nombre}
-                                {opcion.tipo === 'basica' && (
-                                  <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
-                                    PRESELECCIONADO
-                                  </span>
-                                )}
-                              </h4>
-                              <span className={`text-2xl font-bold ${
-                                opcion.tipo === 'basica' ? 'text-green-600' :
-                                opcion.tipo === 'solicitar_info' ? 'text-orange-600' :
-                                'text-blue-600'
-                              }`}>
-                                {opcion.precio}
-                              </span>
+                              <h4 className="text-lg font-semibold text-gray-900">{opcion.nombre}</h4>
+                              <span className="text-2xl font-bold text-blue-600">{opcion.precio}</span>
                             </div>
-                            <p className={`mb-3 ${
-                              opcion.tipo === 'basica' ? 'text-green-700' :
-                              opcion.tipo === 'solicitar_info' ? 'text-orange-700' :
-                              'text-gray-600'
-                            }`}>
-                              {opcion.descripcion}
-                            </p>
+                            <p className="text-gray-600 mb-3">{opcion.descripcion}</p>
                             <div className="grid md:grid-cols-2 gap-1">
                               {opcion.incluye.map((item, index) => (
-                                <p key={index} className={`text-sm ${
-                                  opcion.tipo === 'basica' ? 'text-green-700' :
-                                  opcion.tipo === 'solicitar_info' ? 'text-orange-700' :
-                                  'text-gray-700'
-                                }`}>
-                                  ✓ {item}
-                                </p>
+                                <p key={index} className="text-sm text-gray-700">✓ {item}</p>
                               ))}
                             </div>
                           </div>
