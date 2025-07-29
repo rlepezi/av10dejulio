@@ -1115,7 +1115,7 @@ export default function SolicitudesRegistro() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div><span className="font-medium text-gray-700">Nombres:</span> <span className="text-gray-900">{solicitudSeleccionada.nombres_representante || solicitudSeleccionada.representante?.nombre || 'No especificado'}</span></div>
                   <div><span className="font-medium text-gray-700">Apellidos:</span> <span className="text-gray-900">{solicitudSeleccionada.apellidos_representante || solicitudSeleccionada.representante?.apellidos || 'No especificado'}</span></div>
-                  <div><span className="font-medium text-gray-700">RUT:</span> <span className="text-gray-900">{solicitudSeleccionada.rut_representante || solicitudSeleccionada.representante?.rut || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">RUT:</span> <span className="text-gray-900">{solicitudSeleccionada.rut_representante || solicitudSeleccionada.representante?.rut_representante || 'No especificado'}</span></div>
                   <div><span className="font-medium text-gray-700">Cargo:</span> <span className="text-gray-900">{solicitudSeleccionada.cargo_representante || solicitudSeleccionada.representante?.cargo || 'No especificado'}</span></div>
                   <div><span className="font-medium text-gray-700">Fecha de nacimiento:</span> <span className="text-gray-900">{solicitudSeleccionada.fecha_nacimiento_representante || 'No especificado'}</span></div>
                   <div><span className="font-medium text-gray-700">Email:</span> <span className="text-gray-900">{solicitudSeleccionada.email_representante || solicitudSeleccionada.representante?.email || 'No especificado'}</span></div>
@@ -1215,6 +1215,48 @@ export default function SolicitudesRegistro() {
                 onClick={() => setMostrandoModal(false)}
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
               >Cerrar</button>
+              {solicitudSeleccionada.estado === 'en_revision' && (
+                <button
+                  onClick={activarConPerfilCompleto}
+                  disabled={procesando}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  🎯 Activar empresa
+                </button>
+              )}
+              {solicitudSeleccionada.estado === 'pendiente' && (
+                <button
+                  onClick={async () => {
+                    setProcesando(true);
+                    try {
+                      await cambiarEstadoSolicitud(
+                        solicitudSeleccionada.id,
+                        'en_revision',
+                        'Solicitud pasada a revisión por el administrador.'
+                      );
+                      await cargarSolicitudes();
+                      setMostrandoModal(false);
+                    } catch (error) {
+                      alert('Error al pasar a revisión: ' + error.message);
+                    } finally {
+                      setProcesando(false);
+                    }
+                  }}
+                  disabled={procesando}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  🔍 Pasar a revisión
+                </button>
+              )}
+              {solicitudSeleccionada.estado === 'activada' && (
+                <button
+                  onClick={() => setMostrandoModalCredenciales(true)}
+                  disabled={procesando}
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                >
+                  🔑 Asignar Credenciales
+                </button>
+              )}
             </div>
           </div>
         </div>
