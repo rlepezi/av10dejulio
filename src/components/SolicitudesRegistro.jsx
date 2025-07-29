@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, addDoc, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import React from 'react';
 import { useAuth } from './AuthProvider';
+import { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy } from 'firebase/firestore';
+
+// Utilidad recursiva para mostrar todos los campos y tipos
 
 const ESTADOS_SOLICITUD = [
   { value: '', label: 'Todos los estados', color: 'gray' },
@@ -22,6 +25,118 @@ export default function SolicitudesRegistro() {
     fechaDesde: '',
     fechaHasta: ''
   });
+
+  // Utilidad recursiva para mostrar todos los campos y tipos
+  function renderAllFields(obj, parentKey = '') {
+    if (obj === null) {
+      return (
+        <div className="mb-1"><span className="font-mono text-gray-700">{parentKey || 'null'}</span>: <span className="text-red-700">null</span></div>
+      );
+    }
+    if (typeof obj === 'boolean') {
+      return (
+        <div className="mb-1"><span className="font-mono text-gray-700">{parentKey}</span>: <span className={obj ? 'text-green-700' : 'text-red-700'}>{obj ? 'true' : 'false'}</span> <span className="text-gray-400">(boolean)</span></div>
+      );
+    }
+    if (typeof obj === 'number') {
+      return (
+        <div className="mb-1"><span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-blue-700">{obj}</span> <span className="text-gray-400">(number)</span></div>
+      );
+    }
+    if (typeof obj === 'string') {
+      // Si es base64 de imagen, mostrar preview
+      if (parentKey && (parentKey.toLowerCase().includes('logo') || parentKey.toLowerCase().includes('imagen')) && obj.startsWith('data:image')) {
+        return (
+          <div className="mb-1 flex items-center gap-2">
+            <span className="font-mono text-gray-700">{parentKey}</span>:
+            <img src={obj} alt={parentKey} className="h-12 w-12 object-contain border rounded bg-white" />
+            <span className="text-gray-400">(imagen)</span>
+          </div>
+        );
+      }
+      return (
+        <div className="mb-1"><span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-gray-900">{obj || <span className="text-red-700">'""'</span>}</span> <span className="text-gray-400">(string)</span></div>
+      );
+    }
+    if (Array.isArray(obj)) {
+      // Si es galería de imágenes, mostrar previews
+      if (parentKey && (parentKey.toLowerCase().includes('galeria') || parentKey.toLowerCase().includes('imagenes'))) {
+        return (
+          <div className="mb-2">
+            <span className="font-medium">Descripción:</span> {
+              solicitud.datos_solicitud?.descripcionCompleta ||
+              solicitud.datos_solicitud?.descripcion ||
+              solicitud.descripcionCompleta ||
+              solicitud.descripcion ||
+              <span className="text-red-700">[sin descripción]</span>
+            }
+            <div className="mt-2">
+              {obj.length === 0 ? (
+                <span className="text-red-700">[vacío]</span>
+              ) : (
+                obj.map((img, idx) => {
+                  if (typeof img === 'string' && img.startsWith('data:image')) {
+                    return <img key={idx} src={img} alt={`img${idx}`} className="h-12 w-12 object-cover border rounded bg-white" />;
+                  }
+                  if (img && typeof img === 'object' && img.base64) {
+                    return <img key={idx} src={img.base64} alt={img.name || `img${idx}`} className="h-12 w-12 object-cover border rounded bg-white" />;
+                  }
+                  if (typeof img === 'string' && (img.startsWith('http') || img.startsWith('/'))) {
+                    return <img key={idx} src={img} alt={`img${idx}`} className="h-12 w-12 object-cover border rounded bg-white" />;
+                  }
+                  return <span key={idx} className="text-gray-400">(no imagen)</span>;
+                })
+              )}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="mb-1">
+          <span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-gray-400">(array, {obj.length} items)</span>
+          <div className="ml-4 border-l-2 border-gray-200 pl-2">
+            {obj.length === 0 ? <span className="text-red-700">[vacío]</span> : obj.map((item, idx) => (
+              <div key={idx}>{renderAllFields(item, `[${idx}]`)}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (typeof obj === 'object') {
+      // Firestore Timestamp special handling
+      if (obj && typeof obj.toDate === 'function') {
+        const date = obj.toDate();
+        return (
+          <div className="mb-1"><span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-purple-700">{date.toLocaleString()}</span> <span className="text-gray-400">(timestamp)</span></div>
+        );
+      }
+      // File data special handling (logo, galeria)
+      if (obj && obj.base64 && obj.name) {
+        return (
+          <div className="mb-1 flex items-center gap-2">
+            <span className="font-mono text-gray-700">{parentKey}</span>:
+            <img src={obj.base64} alt={obj.name} className="h-12 w-12 object-contain border rounded bg-white" />
+            <span className="text-pink-700">Archivo: {obj.name} ({(obj.size/1024/1024).toFixed(2)} MB)</span>
+          </div>
+        );
+      }
+      // General object/map
+      return (
+        <div className="mb-1">
+          <span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-gray-400">(map)</span>
+          <div className="ml-4 border-l-2 border-gray-200 pl-2">
+            {Object.keys(obj).length === 0 ? <span className="text-red-700">[vacío]</span> : Object.entries(obj).map(([key, value]) => (
+              <div key={key}>{renderAllFields(value, key)}</div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    // Fallback
+    return (
+      <div className="mb-1"><span className="font-mono text-gray-700">{parentKey}</span>: <span className="text-gray-400">(tipo desconocido)</span></div>
+    );
+  }
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState(null);
   const [mostrandoModal, setMostrandoModal] = useState(false);
   const [mostrandoFormulario, setMostrandoFormulario] = useState(false);
@@ -92,15 +207,134 @@ export default function SolicitudesRegistro() {
   const cargarSolicitudes = async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'solicitudes_empresa'), orderBy('fecha_solicitud', 'desc'));
-      const snapshot = await getDocs(q);
-      const solicitudesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setSolicitudes(solicitudesData);
+      console.log('🔍 DEBUG: Iniciando carga de solicitudes...');
+      
+      // Primero obtengamos todos los documentos sin orderBy para debug
+      const allDocsQuery = query(collection(db, 'solicitudes_empresa'));
+      const allSnapshot = await getDocs(allDocsQuery);
+      console.log('🔍 DEBUG: TOTAL documentos en solicitudes_empresa (sin filtros):', allSnapshot.docs.length);
+      
+      // Debuggeamos cada documento completo
+      allSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`🔍 DEBUG DOC ${index + 1}:`, {
+          id: doc.id,
+          nombre_empresa: data.nombre_empresa || data.nombre,
+          estado: data.estado,
+          fecha_solicitud: data.fecha_solicitud || data.fecha_registro,
+          hasDateField: !!(data.fecha_solicitud || data.fecha_registro),
+          dateType: typeof (data.fecha_solicitud || data.fecha_registro),
+          dateValue: data.fecha_solicitud || data.fecha_registro,
+          origen: data.origen || 'no especificado',
+          allFields: Object.keys(data)
+        });
+      });
+      
+      // Ahora intentemos con orderBy - probamos ambos campos de fecha
+      console.log('🔍 DEBUG: Intentando query con orderBy...');
+      let q;
+      try {
+        // Primero intentamos con fecha_registro (nueva estructura)
+        q = query(collection(db, 'solicitudes_empresa'), orderBy('fecha_registro', 'desc'));
+        const snapshot = await getDocs(q);
+        console.log('🔍 DEBUG: Query con orderBy (fecha_registro) exitoso, docs:', snapshot.docs.length);
+        
+        const solicitudesData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('🔍 DEBUG: Documento en resultado final:', { 
+            id: doc.id,
+            estado: data.estado,
+            fecha: data.fecha_registro || data.fecha_solicitud,
+            nombre: data.nombre || data.nombre_empresa 
+          });
+          
+          // Normalizar datos para compatibilidad con componente
+          return {
+            id: doc.id,
+            ...data,
+            // Campos compatibles con estructura anterior
+            nombre_empresa: data.nombre || data.nombre_empresa,
+            email_empresa: data.email || data.email_empresa,
+            telefono_empresa: data.telefono || data.telefono_empresa,
+            direccion_empresa: data.direccion || data.direccion_empresa,
+            rut_empresa: data.rut || data.rut_empresa,
+            web_actual: data.web || data.web_actual,
+            fecha_solicitud: data.fecha_registro || data.fecha_solicitud,
+            // Representante normalizado
+            nombres_representante: data.representante?.nombre || data.nombres_representante,
+            apellidos_representante: data.representante?.apellidos || data.apellidos_representante,
+            email_representante: data.representante?.email || data.email_representante,
+            telefono_representante: data.representante?.telefono || data.telefono_representante,
+            cargo_representante: data.representante?.cargo || data.cargo_representante
+          };
+        });
+        
+        console.log('🔍 DEBUG: Total solicitudes cargadas:', solicitudesData.length);
+        setSolicitudes(solicitudesData);
+      } catch (orderByError) {
+        console.error('❌ ERROR con orderBy fecha_registro, intentando fecha_solicitud:', orderByError);
+        try {
+          // Fallback con fecha_solicitud (estructura anterior)
+          q = query(collection(db, 'solicitudes_empresa'), orderBy('fecha_solicitud', 'desc'));
+          const snapshot = await getDocs(q);
+          console.log('🔍 DEBUG: Query con orderBy (fecha_solicitud) exitoso, docs:', snapshot.docs.length);
+          
+          const solicitudesData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              // Normalizar para ambas estructuras
+              nombre_empresa: data.nombre || data.nombre_empresa,
+              email_empresa: data.email || data.email_empresa,
+              telefono_empresa: data.telefono || data.telefono_empresa,
+              direccion_empresa: data.direccion || data.direccion_empresa,
+              rut_empresa: data.rut || data.rut_empresa,
+              web_actual: data.web || data.web_actual,
+              fecha_solicitud: data.fecha_registro || data.fecha_solicitud,
+              nombres_representante: data.representante?.nombre || data.nombres_representante,
+              apellidos_representante: data.representante?.apellidos || data.apellidos_representante,
+              email_representante: data.representante?.email || data.email_representante,
+              telefono_representante: data.representante?.telefono || data.telefono_representante,
+              cargo_representante: data.representante?.cargo || data.cargo_representante
+            };
+          });
+          
+          setSolicitudes(solicitudesData);
+        } catch (fallbackError) {
+          console.error('❌ ERROR con orderBy fecha_solicitud también:', fallbackError);
+          console.log('🔄 Intentando sin orderBy...');
+          
+          // Fallback sin orderBy
+          const simpleSnapshot = await getDocs(allDocsQuery);
+          const solicitudesData = simpleSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              // Normalizar para ambas estructuras
+              nombre_empresa: data.nombre || data.nombre_empresa,
+              email_empresa: data.email || data.email_empresa,
+              telefono_empresa: data.telefono || data.telefono_empresa,
+              direccion_empresa: data.direccion || data.direccion_empresa,
+              rut_empresa: data.rut || data.rut_empresa,
+              web_actual: data.web || data.web_actual,
+              fecha_solicitud: data.fecha_registro || data.fecha_solicitud,
+              nombres_representante: data.representante?.nombre || data.nombres_representante,
+              apellidos_representante: data.representante?.apellidos || data.apellidos_representante,
+              email_representante: data.representante?.email || data.email_representante,
+              telefono_representante: data.representante?.telefono || data.telefono_representante,
+              cargo_representante: data.representante?.cargo || data.cargo_representante
+            };
+          });
+          
+          console.log('🔍 DEBUG: Solicitudes cargadas sin orderBy:', solicitudesData.length);
+          setSolicitudes(solicitudesData);
+        }
+      }
     } catch (error) {
-      console.error('Error cargando solicitudes:', error);
+      console.error('❌ Error cargando solicitudes:', error);
+      console.error('❌ Error completo:', error.message, error.code);
     } finally {
       setLoading(false);
     }
@@ -158,6 +392,9 @@ export default function SolicitudesRegistro() {
         region: solicitud.region,
         rut: solicitud.rut_empresa,
         web: solicitud.web_actual || '',
+        // Heredar rubro y tipoEmpresa de todas las variantes posibles
+        rubro: solicitud.rubro || solicitud.datos_solicitud?.rubro || solicitud.categoria || '',
+        tipoEmpresa: solicitud.tipoEmpresa || solicitud.datos_solicitud?.tipoEmpresa || '',
         
         // DATOS COMPLETADOS EN REVISIÓN
         descripcion_completa: datosPerfilForm.descripcion_completa,
@@ -192,6 +429,8 @@ export default function SolicitudesRegistro() {
         fecha_activacion: new Date(),
         admin_activador: user?.email,
         solicitud_origen_id: solicitudId,
+        descripcion: descripcion_completa,
+        descripcion_completa: descripcion_completa,
 
         // Configuraciones mejoradas
         logoAsignado: !!datosPerfilForm.logo_url,
@@ -217,7 +456,6 @@ export default function SolicitudesRegistro() {
   const crearEmpresaDesdeActivacion = async (solicitudId) => {
     const solicitud = solicitudes.find(s => s.id === solicitudId);
     if (!solicitud) return;
-
     try {
       const empresaData = {
         // Información básica
@@ -229,7 +467,20 @@ export default function SolicitudesRegistro() {
         region: solicitud.region,
         rut: solicitud.rut_empresa,
         web: solicitud.web_actual || '',
-        
+        // Heredar tipoEmpresa y rubro de todas las variantes posibles
+        tipoEmpresa: solicitud.tipoEmpresa || solicitud.datos_solicitud?.tipoEmpresa || solicitud["tipo_empresa"] || solicitud.tipo_empresa || '',
+        rubro: solicitud.rubro || solicitud.datos_solicitud?.rubro || solicitud.categoria || '',
+        // Heredar descripción, servicios, marcas, logo e imágenes de la solicitud
+        descripcion: solicitud.descripcion || solicitud.descripcionCompleta || solicitud.datos_solicitud?.descripcion || '',
+        descripcionCompleta: solicitud.descripcionCompleta || solicitud.descripcion || solicitud.descripcionCompleta || solicitud.datos_solicitud?.descripcionCompleta || solicitud.datos_solicitud?.descripcion || '',
+        servicios: solicitud.servicios || solicitud.categorias_servicios || solicitud.datos_solicitud?.servicios || [],
+        marcas: (solicitud.marcas && solicitud.marcas.length > 0 && solicitud.marcas)
+          || (solicitud.marcas_vehiculos && solicitud.marcas_vehiculos.length > 0 && solicitud.marcas_vehiculos)
+          || (solicitud.datos_solicitud && Array.isArray(solicitud.datos_solicitud.marcas) && solicitud.datos_solicitud.marcas.length > 0 && solicitud.datos_solicitud.marcas)
+          || (solicitud.perfil_publico && Array.isArray(solicitud.perfil_publico.marcas) && solicitud.perfil_publico.marcas.length > 0 && solicitud.perfil_publico.marcas)
+          || [],
+        logo: solicitud.logo || solicitud.logo_file_data || solicitud.datos_solicitud?.logo_file_data || solicitud.perfil_publico?.logo || '',
+        galeria: solicitud.galeria || solicitud.galeria_files_data || solicitud.datos_solicitud?.galeria_files_data || solicitud.perfil_publico?.galeria || [],
         // Representante
         representante: {
           nombre: solicitud.nombres_representante || solicitud.representante_nombre || '',
@@ -238,22 +489,20 @@ export default function SolicitudesRegistro() {
           email: solicitud.email_representante || '',
           telefono: solicitud.telefono_representante || ''
         },
-
         // Estado y configuración - PRIMERA ETAPA
-        estado: 'activa', // Visible en home
-        etapa_proceso: 'activada_sin_credenciales', // Nueva propiedad para controlar el flujo
+        estado: 'activa',
+        etapa_proceso: 'activada_sin_credenciales',
         categoria: solicitud.categoria || 'Sin categoría',
         fecha_registro: new Date(),
         fecha_activacion: new Date(),
         admin_activador: user?.email,
         solicitud_origen_id: solicitudId,
-
         // Configuraciones por defecto
-        logoAsignado: false,
+        logoAsignado: !!(solicitud.logo || solicitud.logo_file_data || solicitud.datos_solicitud?.logo_file_data || solicitud.perfil_publico?.logo),
         webValidada: !!solicitud.web_actual,
         perfilCompleto: false,
-        tiene_credenciales_asignadas: false, // Para segunda etapa
-        usuario_empresa: null, // Se asignará en segunda etapa
+        tiene_credenciales_asignadas: false,
+        usuario_empresa: null,
         horarios: {
           lunes: { activo: true, inicio: '09:00', fin: '18:00' },
           martes: { activo: true, inicio: '09:00', fin: '18:00' },
@@ -543,6 +792,62 @@ export default function SolicitudesRegistro() {
     return estadoConfig?.color || 'gray';
   };
 
+  // Función de debug para crear solicitud de prueba
+  const crearSolicitudDebug = async () => {
+    try {
+      console.log('🧪 DEBUG: Creando solicitud de prueba...');
+      
+      const solicitudPrueba = {
+        nombre_empresa: 'Empresa Debug Test',
+        email_empresa: 'debug@test.com',
+        telefono_empresa: '123456789',
+        direccion_empresa: 'Calle Debug 123',
+        web_actual: 'https://debug.com',
+        comuna: 'Santiago',
+        region: 'Metropolitana',
+        categoria: 'Tecnología',
+        descripcion_empresa: 'Empresa de prueba para debug',
+        anos_funcionamiento: '5',
+        logo_url: '',
+        redes_sociales: {
+          facebook: '',
+          instagram: '',
+          linkedin: '',
+          twitter: ''
+        },
+        representante: {
+          nombres_representante: 'Juan',
+          apellidos_representante: 'Pérez',
+          email_representante: 'juan@debug.com',
+          telefono_representante: '987654321',
+          cargo_representante: 'Gerente'
+        },
+        fecha_solicitud: new Date(),
+        fecha_registro: new Date(),
+        fecha_actualizacion: new Date(),
+        estado: 'pendiente',
+        origen: 'debug_admin'
+      };
+      
+      console.log('🧪 DEBUG: Datos de solicitud de prueba:', solicitudPrueba);
+      
+      // Normalizar usando normalizeSolicitudData para preservar fecha_solicitud
+      const solicitudNormalizada = normalizeSolicitudData(solicitudPrueba);
+      console.log('🧪 DEBUG: Datos normalizados:', solicitudNormalizada);
+      console.log('🧪 DEBUG: fecha_solicitud:', solicitudNormalizada.fecha_solicitud);
+      
+      const docRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudNormalizada);
+      console.log('✅ DEBUG: Solicitud de prueba creada con ID:', docRef.id);
+      
+      alert('Solicitud de prueba creada exitosamente!');
+      await cargarSolicitudes();
+      
+    } catch (error) {
+      console.error('❌ ERROR creando solicitud de prueba:', error);
+      alert('Error creando solicitud de prueba: ' + error.message);
+    }
+  };
+
   const estadisticas = {
     total: solicitudes.length,
     pendientes: solicitudes.filter(s => s.estado === 'pendiente').length,
@@ -614,6 +919,16 @@ export default function SolicitudesRegistro() {
           <div className="text-2xl font-bold text-red-800">{estadisticas.rechazadas}</div>
           <div className="text-red-600 text-sm">Rechazadas</div>
         </div>
+      </div>
+
+      {/* Botón de Debug */}
+      <div className="mb-6">
+        <button
+          onClick={crearSolicitudDebug}
+          className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          🧪 Crear Solicitud de Prueba (Debug)
+        </button>
       </div>
 
       {/* Filtros */}
@@ -758,173 +1073,148 @@ export default function SolicitudesRegistro() {
 
       {/* Modal de detalles */}
       {mostrandoModal && solicitudSeleccionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
-                Detalles de Solicitud: {solicitudSeleccionada.nombre_empresa}
+        <div className="fixed inset-0 z-50 flex">
+          {/* Fondo oscuro */}
+          <div className="fixed inset-0 bg-black bg-opacity-40 transition-opacity" onClick={() => setMostrandoModal(false)}></div>
+          {/* Drawer lateral */}
+          <div className="relative ml-auto w-full max-w-2xl h-full bg-white shadow-2xl flex flex-col animate-slideInRight">
+            {/* Cabecera fija */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-blue-900 truncate pr-4">
+                Detalles de Solicitud
+                <span className="block text-base font-normal text-gray-700">{solicitudSeleccionada.nombre_empresa}</span>
               </h3>
               <button
                 onClick={() => setMostrandoModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+                aria-label="Cerrar"
+              >✕</button>
             </div>
+            {/* Contenido scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Sección Empresa */}
+              <details open className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <summary className="font-semibold text-blue-900 cursor-pointer mb-2">🏢 Información de la Empresa</summary>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div><span className="font-medium text-gray-700">Nombre:</span> <span className="text-gray-900">{solicitudSeleccionada.nombre_empresa || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">RUT:</span> <span className="text-gray-900">{solicitudSeleccionada.rut_empresa || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Dirección:</span> <span className="text-gray-900">{solicitudSeleccionada.direccion_empresa || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Comuna:</span> <span className="text-gray-900">{solicitudSeleccionada.comuna || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Región:</span> <span className="text-gray-900">{solicitudSeleccionada.region || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Teléfono:</span> <span className="text-gray-900">{solicitudSeleccionada.telefono_empresa || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Email:</span> <span className="text-gray-900">{solicitudSeleccionada.email_empresa || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Sitio Web:</span> <span className="text-gray-900">{solicitudSeleccionada.web_actual ? (<a href={solicitudSeleccionada.web_actual} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{solicitudSeleccionada.web_actual}</a>) : 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Rubro:</span> <span className="text-gray-900">{solicitudSeleccionada.rubro || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Tipo de empresa:</span> <span className="text-gray-900">{solicitudSeleccionada.tipoEmpresa || 'No especificado'}</span></div>
+                </div>
+              </details>
 
-            <div className="space-y-4 mb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Información de la Empresa</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>RUT:</strong> {solicitudSeleccionada.rut_empresa}</p>
-                    <p><strong>Dirección:</strong> {solicitudSeleccionada.direccion_empresa}</p>
-                    <p><strong>Comuna:</strong> {solicitudSeleccionada.comuna}</p>
-                    <p><strong>Región:</strong> {solicitudSeleccionada.region}</p>
-                    <p><strong>Teléfono:</strong> {solicitudSeleccionada.telefono_empresa}</p>
+              {/* Sección Representante */}
+              <details className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <summary className="font-semibold text-green-900 cursor-pointer mb-2">👤 Representante Legal</summary>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div><span className="font-medium text-gray-700">Nombres:</span> <span className="text-gray-900">{solicitudSeleccionada.nombres_representante || solicitudSeleccionada.representante?.nombre || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Apellidos:</span> <span className="text-gray-900">{solicitudSeleccionada.apellidos_representante || solicitudSeleccionada.representante?.apellidos || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">RUT:</span> <span className="text-gray-900">{solicitudSeleccionada.rut_representante || solicitudSeleccionada.representante?.rut || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Cargo:</span> <span className="text-gray-900">{solicitudSeleccionada.cargo_representante || solicitudSeleccionada.representante?.cargo || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Fecha de nacimiento:</span> <span className="text-gray-900">{solicitudSeleccionada.fecha_nacimiento_representante || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Email:</span> <span className="text-gray-900">{solicitudSeleccionada.email_representante || solicitudSeleccionada.representante?.email || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Teléfono:</span> <span className="text-gray-900">{solicitudSeleccionada.telefono_representante || solicitudSeleccionada.representante?.telefono || 'No especificado'}</span></div>
+                </div>
+              </details>
+
+              {/* Sección Negocio */}
+              <details className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <summary className="font-semibold text-purple-900 cursor-pointer mb-2">💼 Información del Negocio</summary>
+                <div className="space-y-3 text-sm">
+                  <div><span className="font-medium text-gray-700">Descripción:</span> <span className="text-gray-900">{solicitudSeleccionada.descripcionCompleta || solicitudSeleccionada.datos_solicitud?.descripcion || 'No especificado'}</span></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div><span className="font-medium text-gray-700">Años de funcionamiento:</span> <span className="text-gray-900">{solicitudSeleccionada.anos_funcionamiento || solicitudSeleccionada.datos_solicitud?.anos_funcionamiento || 'No especificado'}</span></div>
+                    <div><span className="font-medium text-gray-700">Número de empleados:</span> <span className="text-gray-900">{solicitudSeleccionada.numero_empleados || solicitudSeleccionada.datos_solicitud?.numero_empleados || 'No especificado'}</span></div>
                   </div>
                 </div>
-                
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Representante Legal</h4>
-                  <div className="space-y-1 text-sm">
-                    <p><strong>Nombre:</strong> {(solicitudSeleccionada.nombres_representante || solicitudSeleccionada.representante_nombre) || 'No especificado'} {(solicitudSeleccionada.apellidos_representante || solicitudSeleccionada.representante_apellidos) || ''}</p>
-                    <p><strong>Cargo:</strong> {solicitudSeleccionada.cargo_representante}</p>
-                    <p><strong>Email:</strong> {solicitudSeleccionada.email_representante}</p>
-                    <p><strong>Teléfono:</strong> {solicitudSeleccionada.telefono_representante}</p>
+              </details>
+
+              {/* Sección Multimedia */}
+              <details className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+                <summary className="font-semibold text-pink-900 cursor-pointer mb-2">📸 Archivos Multimedia</summary>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">Logo de la empresa:</h5>
+                    {solicitudSeleccionada.logo || solicitudSeleccionada.datos_solicitud?.logo_file_data ? (
+                      <div className="bg-white p-2 rounded border">
+                        <img 
+                          src={solicitudSeleccionada.logo || solicitudSeleccionada.datos_solicitud?.logo_file_data?.base64} 
+                          alt="Logo empresa" 
+                          className="h-16 w-16 object-cover rounded border"
+                        />
+                        {solicitudSeleccionada.datos_solicitud?.logo_file_data && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            {solicitudSeleccionada.datos_solicitud.logo_file_data.name} 
+                            ({(solicitudSeleccionada.datos_solicitud.logo_file_data.size / 1024 / 1024).toFixed(2)} MB)
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600 text-sm">No hay logo subido</p>
+                    )}
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-gray-700 mb-2">Galería de imágenes:</h5>
+                    {(solicitudSeleccionada.galeria && solicitudSeleccionada.galeria.length > 0) || 
+                     (solicitudSeleccionada.datos_solicitud?.galeria_files_data && solicitudSeleccionada.datos_solicitud.galeria_files_data.length > 0) ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {(solicitudSeleccionada.galeria || solicitudSeleccionada.datos_solicitud?.galeria_files_data?.map(f => f.base64) || []).map((imagen, index) => (
+                          <img 
+                            key={index}
+                            src={imagen} 
+                            alt={`Galería ${index + 1}`} 
+                            className="h-16 w-16 object-cover rounded border"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-600 text-sm">No hay imágenes en la galería</p>
+                    )}
                   </div>
                 </div>
-              </div>
+              </details>
 
-              {solicitudSeleccionada.comentario_admin && (
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Comentarios del Administrador</h4>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                    {solicitudSeleccionada.comentario_admin}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Acciones */}
-            <div className="flex justify-end space-x-3">
-              {/* Etapa 1: Pendiente */}
-              {solicitudSeleccionada.estado === 'pendiente' && (
-                <>
-                  <button
-                    onClick={() => cambiarEstadoSolicitud(solicitudSeleccionada.id, 'en_revision')}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Pasar a Revisión
-                  </button>
-                  <button
-                    onClick={() => cambiarEstadoSolicitud(solicitudSeleccionada.id, 'rechazada')}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-              
-              {/* Etapa 2: En Revisión - Primera etapa del nuevo flujo */}
-              {solicitudSeleccionada.estado === 'en_revision' && (
-                <>
-                  <button
-                    onClick={iniciarModoRevision}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-                  >
-                    🔍 Revisar y Completar Información
-                  </button>
-                  <button
-                    onClick={() => cambiarEstadoSolicitud(solicitudSeleccionada.id, 'activada')}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    🎯 Activar Empresa (Rápido)
-                  </button>
-                  <button
-                    onClick={() => cambiarEstadoSolicitud(solicitudSeleccionada.id, 'rechazada')}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-
-              {/* Etapa 3: Activada - Segunda etapa del nuevo flujo */}
-              {solicitudSeleccionada.estado === 'activada' && (
-                <div className="flex flex-col space-y-2">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                    <p className="text-green-800 text-sm font-medium">
-                      ✅ Empresa activada y visible en el home
-                    </p>
-                    <p className="text-green-600 text-xs">
-                      Siguiente paso: Asignar credenciales para que la empresa pueda gestionar su información
-                    </p>
+              {/* Sección Términos y Control */}
+              <details className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <summary className="font-semibold text-gray-900 cursor-pointer mb-2">📋 Términos y Control</summary>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center">
+                    <span className={`w-4 h-4 mr-2 rounded ${(solicitudSeleccionada.datos_solicitud?.acepta_terminos ?? solicitudSeleccionada.acepta_terminos) ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span>Acepta términos y condiciones: {(solicitudSeleccionada.datos_solicitud?.acepta_terminos ?? solicitudSeleccionada.acepta_terminos) ? 'Sí' : 'No'}</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      setMostrandoModal(false);
-                      setMostrandoModalCredenciales(true);
-                    }}
-                    disabled={procesando}
-                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-                  >
-                    🔑 Asignar Credenciales de Acceso
-                  </button>
-                </div>
-              )}
-
-              {/* Etapa 4: Credenciales Asignadas - Proceso completado */}
-              {solicitudSeleccionada.estado === 'credenciales_asignadas' && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                  <p className="text-purple-800 text-sm font-medium">
-                    🎉 Proceso completado exitosamente
-                  </p>
-                  <p className="text-purple-600 text-xs">
-                    La empresa está visible en el home y tiene credenciales para gestionar su información
-                  </p>
-                  {solicitudSeleccionada.usuario_asignado && (
-                    <p className="text-purple-700 text-xs mt-1">
-                      Usuario asignado: {solicitudSeleccionada.usuario_asignado.email}
-                    </p>
+                  <div className="flex items-center">
+                    <span className={`w-4 h-4 mr-2 rounded ${(solicitudSeleccionada.datos_solicitud?.acepta_notificaciones ?? solicitudSeleccionada.acepta_notificaciones) ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span>Acepta notificaciones: {(solicitudSeleccionada.datos_solicitud?.acepta_notificaciones ?? solicitudSeleccionada.acepta_notificaciones) ? 'Sí' : 'No'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className={`w-4 h-4 mr-2 rounded ${(solicitudSeleccionada.datos_solicitud?.acepta_visita_agente ?? solicitudSeleccionada.acepta_visita_campo) ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                    <span>Acepta visita de agente: {(solicitudSeleccionada.datos_solicitud?.acepta_visita_agente ?? solicitudSeleccionada.acepta_visita_campo) ? 'Sí' : 'No'}</span>
+                  </div>
+                  <div><span className="font-medium text-gray-700">Estado actual:</span> <span className="text-gray-900">{solicitudSeleccionada.estado || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Etapa del proceso:</span> <span className="text-gray-900">{solicitudSeleccionada.etapa_proceso || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Fecha de registro:</span> <span className="text-gray-900">{solicitudSeleccionada.fecha_registro?.toDate?.()?.toLocaleDateString() || solicitudSeleccionada.fecha_solicitud?.toDate?.()?.toLocaleDateString() || 'No especificado'}</span></div>
+                  <div><span className="font-medium text-gray-700">Admin activador:</span> <span className="text-gray-900">{solicitudSeleccionada.admin_activador || 'Pendiente'}</span></div>
+                  {solicitudSeleccionada.comentario_admin && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
+                      <span className="font-semibold text-red-900">💬 Comentarios del Administrador:</span>
+                      <p className="text-sm text-red-800 bg-white p-2 rounded border mt-1">{solicitudSeleccionada.comentario_admin}</p>
+                    </div>
                   )}
                 </div>
-              )}
-
-              {/* Estado rechazada */}
-              {solicitudSeleccionada.estado === 'rechazada' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-red-800 text-sm font-medium">
-                    ❌ Solicitud rechazada
-                  </p>
-                  <p className="text-red-600 text-xs">
-                    Esta solicitud ha sido rechazada y no se procesará
-                  </p>
-                </div>
-              )}
-
-              {/* Botón especial para agentes: activación directa */}
-              {esAgente && (solicitudSeleccionada.estado === 'pendiente' || solicitudSeleccionada.estado === 'en_revision') && (
-                <button
-                  onClick={() => cambiarEstadoSolicitud(solicitudSeleccionada.id, 'activada', 'Activada directamente por agente de campo')}
-                  disabled={procesando}
-                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-                >
-                  ⚡ Activar Directamente (Agente)
-                </button>
-              )}
-
+              </details>
+            </div>
+            {/* Footer fijo con acciones */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex justify-end space-x-3">
               <button
                 onClick={() => setMostrandoModal(false)}
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-              >
-                Cerrar
-              </button>
+              >Cerrar</button>
             </div>
           </div>
         </div>
@@ -1113,7 +1403,7 @@ export default function SolicitudesRegistro() {
                   </div>
                 ) : (
                   <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-                    <p className="text-yellow-800 text-sm">
+                    <p className="text-yellow-800 text-sm font-medium">
                       ⚠️ Esta empresa no tiene página web registrada. Se creará un perfil público detallado.
                     </p>
                   </div>
