@@ -132,7 +132,7 @@ const HomePage = () => {
     let filtered = [...empresasActivas];
     
     if (filtroTipoEmpresa) {
-      filtered = filtered.filter(empresa => empresa.tipoEmpresa === filtroTipoEmpresa);
+      filtered = filtered.filter(empresa => (empresa.tipoEmpresa || '').toLowerCase() === filtroTipoEmpresa.toLowerCase());
     }
     
     console.log('🔍 Empresas después del filtro:', filtered.length);
@@ -304,16 +304,25 @@ const HomePage = () => {
                       <h3 className="font-semibold text-gray-900 truncate">
                         {empresa.nombre || 'Sin nombre'}
                       </h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        empresa.estado === 'Activa' || empresa.estado === 'activa' 
-                          ? 'bg-green-100 text-green-800' 
-                          : empresa.estado === 'pendiente' 
+                      <span className={
+                        `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ` +
+                        ((empresa.tipoEmpresa || '').toLowerCase() === 'proveedor'
+                          ? 'bg-blue-100 text-blue-800'
+                          : (empresa.tipoEmpresa || '').toLowerCase() === 'pyme'
                           ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {empresa.estado === 'Activa' || empresa.estado === 'activa' ? '✓ Activa' : 
-                         empresa.estado === 'pendiente' ? '⏳ Pendiente' :
-                         `📄 ${empresa.estado || 'Sin estado'}`}
+                          : (empresa.tipoEmpresa || '').toLowerCase() === 'empresa'
+                          ? 'bg-green-100 text-green-800'
+                          : (empresa.tipoEmpresa || '').toLowerCase() === 'emprendimiento'
+                          ? 'bg-purple-100 text-purple-800'
+                          : (empresa.tipoEmpresa || '').toLowerCase() === 'local'
+                          ? 'bg-pink-100 text-pink-800'
+                          : (empresa.tipoEmpresa || '').toLowerCase() === 'premium'
+                          ? 'bg-gray-800 text-white'
+                          : 'bg-gray-100 text-gray-800')
+                      }>
+                        {empresa.tipoEmpresa
+                          ? `🏷️ ${empresa.tipoEmpresa.charAt(0).toUpperCase() + empresa.tipoEmpresa.slice(1)}`
+                          : '🏷️ Sin tipo'}
                       </span>
                     </div>
                     
