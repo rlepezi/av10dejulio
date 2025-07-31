@@ -29,7 +29,7 @@ const AreaClientePage = () => {
       // Cargar estadísticas de empresas activas
       const empresasQuery = query(
         collection(db, 'empresas'),
-        where('estado', '==', 'Activa')
+        where('estado', '==', 'activa')
       );
       const empresasSnapshot = await getDocs(empresasQuery);
 

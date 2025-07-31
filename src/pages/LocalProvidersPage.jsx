@@ -28,7 +28,7 @@ const LocalProvidersPage = () => {
     try {
       const q = query(
         collection(db, 'empresas'),
-        where('estado', '==', 'Activa'),
+        where('estado', '==', 'activa'),
         orderBy('nombre')
       );
       
@@ -38,9 +38,9 @@ const LocalProvidersPage = () => {
         ...doc.data()
       }));
 
-      // Filtrar solo empresas con tipoEmpresa = 'proveedor'
+      // Filtrar solo empresas con tipoEmpresa = 'proveedor' (insensible a mayúsculas)
       const providersData = allProviders.filter(provider => 
-        provider.tipoEmpresa === 'proveedor'
+        (provider.tipoEmpresa || '').toLowerCase() === 'proveedor'
       );
 
       setProviders(providersData);
@@ -65,7 +65,7 @@ const LocalProvidersPage = () => {
     // Filtro por tipo de empresa
     if (filters.tipoEmpresa) {
       filtered = filtered.filter(provider => 
-        provider.tipoEmpresa === filters.tipoEmpresa
+        (provider.tipoEmpresa || '').toLowerCase() === filters.tipoEmpresa.toLowerCase()
       );
     }
 

@@ -271,29 +271,63 @@ export default function PerfilEmpresaPublica() {
             {/* Columna principal */}
             <div className="lg:col-span-2 space-y-8">
               {/* Descripción */}
-              {(empresa.descripcionCompleta || empresa.descripcion) && (
+              {(
+                empresa.descripcionCompleta || empresa.descripcion || empresa.descripcion_negocio ||
+                (empresa.perfil_publico && (empresa.perfil_publico.descripcion_detallada || empresa.perfil_publico.descripcion))
+              ) && (
                 <section className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">Acerca de Nosotros</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">
-                    {empresa.descripcionCompleta || empresa.descripcion}
+                    {empresa.descripcionCompleta || empresa.descripcion || empresa.descripcion_negocio ||
+                      (empresa.perfil_publico && (empresa.perfil_publico.descripcion_detallada || empresa.perfil_publico.descripcion))}
                   </p>
                 </section>
               )}
 
               {/* Servicios */}
-              {empresa.servicios && empresa.servicios.length > 0 && (
-                <section className="bg-white rounded-xl shadow-sm p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Nuestros Servicios</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {empresa.servicios.map((servicio, index) => (
-                      <div key={index} className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                        <span className="text-blue-600 text-xl">✓</span>
-                        <span className="font-medium text-gray-800">{servicio}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+              {(() => {
+                // Buscar el array de servicios en todas las variantes posibles
+                const servicios =
+                  (empresa.servicios && Array.isArray(empresa.servicios) && empresa.servicios.length > 0 && empresa.servicios) ||
+                  (empresa.servicios_completos && Array.isArray(empresa.servicios_completos) && empresa.servicios_completos.length > 0 && empresa.servicios_completos) ||
+                  (empresa.categorias_servicios && Array.isArray(empresa.categorias_servicios) && empresa.categorias_servicios.length > 0 && empresa.categorias_servicios) ||
+                  (empresa.datos_solicitud && Array.isArray(empresa.datos_solicitud.servicios) && empresa.datos_solicitud.servicios.length > 0 && empresa.datos_solicitud.servicios) ||
+                  (empresa.perfil_publico && Array.isArray(empresa.perfil_publico.servicios) && empresa.perfil_publico.servicios.length > 0 && empresa.perfil_publico.servicios);
+                return servicios && servicios.length > 0 ? (
+                  <section className="bg-white rounded-xl shadow-sm p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Nuestros Servicios</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {servicios.map((servicio, index) => (
+                        <div key={index} className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                          <span className="text-blue-600 text-xl">✓</span>
+                          <span className="font-medium text-gray-800">{servicio}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null;
+              })()}
+
+              {/* Marcas */}
+              {(() => {
+                const marcas =
+                  (empresa.marcas && Array.isArray(empresa.marcas) && empresa.marcas.length > 0 && empresa.marcas) ||
+                  (empresa.marcas_vehiculos && Array.isArray(empresa.marcas_vehiculos) && empresa.marcas_vehiculos.length > 0 && empresa.marcas_vehiculos) ||
+                  (empresa.datos_solicitud && Array.isArray(empresa.datos_solicitud.marcas) && empresa.datos_solicitud.marcas.length > 0 && empresa.datos_solicitud.marcas) ||
+                  (empresa.perfil_publico && Array.isArray(empresa.perfil_publico.marcas) && empresa.perfil_publico.marcas.length > 0 && empresa.perfil_publico.marcas);
+                return marcas && marcas.length > 0 ? (
+                  <section className="bg-white rounded-xl shadow-sm p-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Marcas que Atendemos</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {marcas.map((marca, idx) => (
+                        <span key={idx} className="px-3 py-2 rounded-full bg-green-100 text-green-800 border border-green-300 text-sm font-medium">
+                          {marca}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                ) : null;
+              })()}
 
               {/* Galería de fotos */}
               {empresa.galeria && empresa.galeria.length > 0 && (
@@ -491,24 +525,22 @@ export default function PerfilEmpresaPublica() {
               </div>
             </div>
 
-            {/* Horarios detallados */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Horarios de Atención</h3>
-              <div className="space-y-3">
-                {formatearHorarios().split('\n').map((linea, index) => {
-                  const [dia, horario] = linea.split(':');
-                  const esCerrado = horario.trim() === 'Cerrado';
-                  return (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <span className="font-medium text-gray-700">{dia}:</span>
-                      <span className={`${esCerrado ? 'text-red-600' : 'text-green-600'} font-medium`}>
-                        {horario.trim()}
-                      </span>
+            {/* Horarios */}
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span>🕒</span>
+                  Horarios de Atención
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {formatearHorarios().split('\n').map((linea, index) => (
+                    <div key={index} className="flex justify-between py-1 border-b border-gray-100 last:border-0">
+                      <span className="font-medium text-gray-700">{linea.split(':')[0]}:</span>
+                      <span className="text-gray-600">{linea.split(':').slice(1).join(':').trim()}</span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            
           </div>
         )}
       </div>

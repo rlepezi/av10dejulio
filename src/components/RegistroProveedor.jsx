@@ -370,6 +370,7 @@ function RegistroProveedorSinAuth() {
           newErrors.telefono_representante = 'Debe ingresar +56 seguido de 9 dígitos (ej: +56912345678)';
         }
       }
+      if (!formData.fecha_nacimiento_representante) newErrors.fecha_nacimiento_representante = 'La fecha de nacimiento es obligatoria';
     } else if (currentStep === 3) {
       // Información del negocio
       if (!formData.descripcion_negocio.trim()) newErrors.descripcion_negocio = 'La descripción del negocio es obligatoria';
@@ -472,6 +473,7 @@ function RegistroProveedorSinAuth() {
         admin_responsable: 'admin@av10dejulio.cl',
         contactoAdicional: '',
         solicitud_origen_id: null,
+        origen: 'cliente', // Campo adicional solicitado
         // Subobjetos
         representante: {
           nombre: formData.nombres_representante,
@@ -564,7 +566,10 @@ function RegistroProveedorSinAuth() {
           }
         }
       };
-      const docRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudData);
+      const docRef = await addDoc(collection(db, 'solicitudes_empresa'), {
+        ...solicitudData,
+        fecha_nacimiento_representante: formData.fecha_nacimiento_representante
+      });
       // Notificación admin
       await NotificationService.createInAppNotification(
         'admin',
@@ -575,6 +580,7 @@ function RegistroProveedorSinAuth() {
           solicitudId: docRef.id,
           empresaNombre: formData.nombre_empresa,
           representante: `${formData.nombres_representante} ${formData.apellidos_representante}`,
+          fechaNacimiento: formData.fecha_nacimiento_representante,
           email: formData.email_empresa,
           necesitaWeb: formData.necesita_pagina_web,
           tipoWeb: formData.tipo_pagina_web,
@@ -986,6 +992,18 @@ function RegistroProveedorSinAuth() {
                 <p className="text-xs text-gray-500 mt-1">Ejemplo: +56912345678</p>
                 {errors.telefono_representante && <p className="text-red-500 text-sm mt-1">{errors.telefono_representante}</p>}
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de Nacimiento del Representante *</label>
+                <input
+                  type="date"
+                  name="fecha_nacimiento_representante"
+                  value={formData.fecha_nacimiento_representante || ''}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.fecha_nacimiento_representante ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="dd/mm/aaaa"
+                />
+                {errors.fecha_nacimiento_representante && <p className="text-red-500 text-sm mt-1">{errors.fecha_nacimiento_representante}</p>}
+              </div>
             </div>
           </div>
         )}
@@ -1379,6 +1397,7 @@ function RegistroProveedorSinAuth() {
                   <p><span className="font-medium">Empresa:</span> {formData.nombre_empresa}</p>
                   <p><span className="font-medium">RUT:</span> {formData.rut_empresa}</p>
                   <p><span className="font-medium">Representante:</span> {formData.nombres_representante} {formData.apellidos_representante}</p>
+                  <p><span className="font-medium">Fecha Nacimiento:</span> {formData.fecha_nacimiento_representante}</p>
                   <p><span className="font-medium">Email empresa:</span> {formData.email_empresa}</p>
                   <p><span className="font-medium">Teléfono:</span> {formData.telefono_empresa}</p>
                 </div>
@@ -1615,7 +1634,8 @@ export default function RegistroProveedor() {
               ¡Ya eres un Proveedor!
             </h2>
             <p className="text-gray-600 mb-4">
-              Tu empresa <strong>{perfilProveedor.nombre}</strong> ya está registrada como proveedor en nuestra plataforma.
+              Tu empresa <strong>{perfilProveedor.nombre}</strong> ya está registrada como proveedor en nuestra plataforma.<br />
+              <span className="block mt-2">Fecha de nacimiento del representante: <strong>{perfilProveedor.fecha_nacimiento_representante || perfilProveedor.fechaNacimiento || 'No disponible'}</strong></span>
             </p>
             <button
               onClick={() => navigate('/dashboard/proveedor')}

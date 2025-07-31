@@ -2,37 +2,56 @@ import React, { useState } from 'react';
 import { collection, addDoc, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
+import { 
+  createSolicitudTemplate, 
+  createEmpresaTemplate,
+  validateEmpresaData,
+  normalizeEmpresaData,
+  CAMPOS_EMPRESA,
+  CAMPOS_REPRESENTANTE
+} from '../utils/empresaStandards';
 
 export default function FormularioAgenteEmpresa({ onSolicitudCreada }) {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    direccion: '',
-    categoria: '',
-    rubro: '', // Nuevo campo para rubro específico
-    tipoEmpresa: 'pyme', // Nuevo campo para tipo de empresa
-    descripcion: '',
-    rut: '',
-    contacto_nombre: '',
-    contacto_telefono: '',
-    // NUEVOS CAMPOS REQUERIDOS
-    web: '',
-    anos_funcionamiento: '',
-    redes_sociales: {
+    // Información básica de la empresa - CAMPOS ESTÁNDAR
+    [CAMPOS_EMPRESA.NOMBRE]: '',
+    [CAMPOS_EMPRESA.EMAIL]: '',
+    [CAMPOS_EMPRESA.TELEFONO]: '',
+    [CAMPOS_EMPRESA.DIRECCION]: '',
+    [CAMPOS_EMPRESA.RUT]: '',
+    [CAMPOS_EMPRESA.CATEGORIA]: '',
+    [CAMPOS_EMPRESA.DESCRIPCION]: '',
+    [CAMPOS_EMPRESA.WEB]: '',
+    [CAMPOS_EMPRESA.ANOS_FUNCIONAMIENTO]: '',
+    [CAMPOS_EMPRESA.LOGO_URL]: '',
+    [CAMPOS_EMPRESA.REDES_SOCIALES]: {
       facebook: '',
       instagram: '',
       linkedin: '',
       twitter: ''
     },
-    logo_url: '',
-    // Nuevos campos para datos del encargado
+    
+    // Información del representante - CAMPOS ESTÁNDAR
+    [CAMPOS_REPRESENTANTE.NOMBRES]: '',
+    [CAMPOS_REPRESENTANTE.APELLIDOS]: '',
+    [CAMPOS_REPRESENTANTE.EMAIL]: '',
+    [CAMPOS_REPRESENTANTE.TELEFONO]: '',
+    [CAMPOS_REPRESENTANTE.CARGO]: '',
+    
+    // Campos adicionales específicos del agente
+    rubro: '', // Rubro específico
+    tipoEmpresa: 'pyme', // Tipo de empresa
+    contacto_nombre: '', // Contacto alternativo
+    contacto_telefono: '', // Teléfono de contacto alternativo
+    
+    // Datos del encargado (para cumpleaños)
     encargado_nombre: '',
     encargado_telefono: '',
     encargado_email: '',
     encargado_fecha_nacimiento: '',
     encargado_cargo: '',
+    
     // Campos de validación del agente
     documentacion_validada: false,
     documento_empresa_verificado: false,
@@ -220,41 +239,37 @@ export default function FormularioAgenteEmpresa({ onSolicitudCreada }) {
 
       const ahora = new Date();
       
-      // Crear solicitud de empresa
-      const solicitudData = {
-        // Datos básicos de la empresa
-        nombre_empresa: formData.nombre,
-        email_empresa: formData.email,
-        telefono_empresa: formData.telefono,
-        direccion_empresa: formData.direccion,
-        categoria: formData.categoria,
-        descripcion: formData.descripcion,
-        rut_empresa: formData.rut,
+      // Crear solicitud usando template estándar
+      const solicitudData = createSolicitudTemplate({
+        // Datos básicos de la empresa (usando campos estandarizados)
+        [CAMPOS_EMPRESA.NOMBRE]: formData[CAMPOS_EMPRESA.NOMBRE],
+        [CAMPOS_EMPRESA.EMAIL]: formData[CAMPOS_EMPRESA.EMAIL],
+        [CAMPOS_EMPRESA.TELEFONO]: formData[CAMPOS_EMPRESA.TELEFONO],
+        [CAMPOS_EMPRESA.DIRECCION]: formData[CAMPOS_EMPRESA.DIRECCION],
+        [CAMPOS_EMPRESA.CATEGORIA]: formData[CAMPOS_EMPRESA.CATEGORIA],
+        [CAMPOS_EMPRESA.DESCRIPCION]: formData[CAMPOS_EMPRESA.DESCRIPCION],
+        [CAMPOS_EMPRESA.RUT]: formData[CAMPOS_EMPRESA.RUT],
+        [CAMPOS_EMPRESA.WEB]: formData[CAMPOS_EMPRESA.WEB],
+        [CAMPOS_EMPRESA.ANOS_FUNCIONAMIENTO]: formData[CAMPOS_EMPRESA.ANOS_FUNCIONAMIENTO],
+        [CAMPOS_EMPRESA.REDES_SOCIALES]: formData[CAMPOS_EMPRESA.REDES_SOCIALES],
+        [CAMPOS_EMPRESA.LOGO_URL]: formData[CAMPOS_EMPRESA.LOGO_URL],
+        [CAMPOS_EMPRESA.HORARIOS]: formData[CAMPOS_EMPRESA.HORARIOS],
         
-        // NUEVOS CAMPOS REQUERIDOS
-        web: formData.web,
-        anos_funcionamiento: formData.anos_funcionamiento,
-        redes_sociales: formData.redes_sociales,
-        logo_url: formData.logo_url,
-        
-        // Datos de contacto principal
-        representante_nombre: formData.contacto_nombre || formData.nombre,
-        representante_email: formData.email,
-        representante_telefono: formData.contacto_telefono || formData.telefono,
+        // Datos del representante (usando campos estandarizados)
+        [CAMPOS_REPRESENTANTE.NOMBRE]: formData[CAMPOS_REPRESENTANTE.NOMBRE] || formData[CAMPOS_EMPRESA.NOMBRE],
+        [CAMPOS_REPRESENTANTE.EMAIL]: formData[CAMPOS_EMPRESA.EMAIL],
+        [CAMPOS_REPRESENTANTE.TELEFONO]: formData[CAMPOS_REPRESENTANTE.TELEFONO] || formData[CAMPOS_EMPRESA.TELEFONO],
         
         // Datos del encargado (para cumpleaños)
-        encargado_nombre: formData.encargado_nombre,
-        encargado_telefono: formData.encargado_telefono,
-        encargado_email: formData.encargado_email,
-        encargado_fecha_nacimiento: formData.encargado_fecha_nacimiento,
-        encargado_cargo: formData.encargado_cargo,
-        
-        // Horarios de atención
-        horarios: formData.horarios,
+        [CAMPOS_EMPRESA.ENCARGADO_NOMBRE]: formData[CAMPOS_EMPRESA.ENCARGADO_NOMBRE],
+        [CAMPOS_EMPRESA.ENCARGADO_TELEFONO]: formData[CAMPOS_EMPRESA.ENCARGADO_TELEFONO],
+        [CAMPOS_EMPRESA.ENCARGADO_EMAIL]: formData[CAMPOS_EMPRESA.ENCARGADO_EMAIL],
+        [CAMPOS_EMPRESA.ENCARGADO_FECHA_NACIMIENTO]: formData[CAMPOS_EMPRESA.ENCARGADO_FECHA_NACIMIENTO],
+        [CAMPOS_EMPRESA.ENCARGADO_CARGO]: formData[CAMPOS_EMPRESA.ENCARGADO_CARGO],
         
         // Estado y procesamiento
-        estado: formData.activar_inmediatamente && agenteData.permisos?.activar_empresas ? 'activada' : 'pendiente',
-        fecha_solicitud: ahora,
+        [CAMPOS_EMPRESA.ESTADO]: formData.activar_inmediatamente && agenteData.permisos?.activar_empresas ? ESTADOS_EMPRESA.ACTIVADA : ESTADOS_EMPRESA.PENDIENTE,
+        [CAMPOS_EMPRESA.FECHA_SOLICITUD]: ahora,
         
         // Información del agente
         agente_id: agenteData.id,
@@ -263,44 +278,49 @@ export default function FormularioAgenteEmpresa({ onSolicitudCreada }) {
         agente_zona: agenteData.zona_asignada,
         tipo_solicitud: 'agente_terreno',
         
-        // Validaciones del agente (NUEVO)
+        // Validaciones del agente
         documentacion_validada_por_agente: formData.documentacion_validada,
         documento_empresa_verificado: formData.documento_empresa_verificado,
         firma_acuerdo_obtenida: formData.firma_acuerdo_obtenida,
         direccion_verificada_presencial: formData.direccion_verificada,
         
         // Para distinguir que no requiere visita adicional
-        visita_agente_requerida: false, // No es obligatorio para agentes
+        visita_agente_requerida: false,
         validacion_presencial_completada: formData.documentacion_validada,
         
         // Notas del agente
         notas_agente: `Solicitud creada en terreno por agente ${agenteData.nombre}. ${
           formData.documentacion_validada ? 'Documentación validada presencialmente.' : 'Pendiente validación documental.'
         }`
-      };
+      });
 
-      const solicitudRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudData);
+      // Normalizar datos antes de guardar
+      const solicitudNormalizada = normalizeEmpresaData(solicitudData);
+      const solicitudRef = await addDoc(collection(db, 'solicitudes_empresa'), solicitudNormalizada);
 
       // Si el agente puede activar empresas directamente
       if (formData.activar_inmediatamente && agenteData.permisos?.activar_empresas) {
-        const empresaData = {
-          ...solicitudData,
-          estado: 'activa',
-          etapa_proceso: 'activada_sin_credenciales', // Primera etapa completada
-          fecha_activacion: ahora,
-          solicitud_id: solicitudRef.id,
-          web: formData.web || '', // Puede estar vacío para crear perfil público
-          logo: formData.logo_url || '',
-          verificada: false,
-          activa: true,
-          tiene_credenciales_asignadas: false // Para segunda etapa
-        };
+        // Crear empresa usando template estándar y normalizando datos
+        const empresaData = createEmpresaTemplate({
+          ...solicitudNormalizada,
+          [CAMPOS_EMPRESA.ESTADO]: ESTADOS_EMPRESA.ACTIVA,
+          [CAMPOS_EMPRESA.ETAPA_PROCESO]: ETAPAS_PROCESO.ACTIVADA_SIN_CREDENCIALES,
+          [CAMPOS_EMPRESA.FECHA_ACTIVACION]: ahora,
+          [CAMPOS_EMPRESA.SOLICITUD_ID]: solicitudRef.id,
+          [CAMPOS_EMPRESA.WEB]: formData[CAMPOS_EMPRESA.WEB] || '',
+          [CAMPOS_EMPRESA.LOGO]: formData[CAMPOS_EMPRESA.LOGO_URL] || '',
+          [CAMPOS_EMPRESA.VERIFICADA]: false,
+          [CAMPOS_EMPRESA.ACTIVA]: true,
+          [CAMPOS_EMPRESA.TIENE_CREDENCIALES_ASIGNADAS]: false
+        });
 
-        delete empresaData.fecha_solicitud;
+        // Remover campos específicos de solicitud
+        delete empresaData[CAMPOS_EMPRESA.FECHA_SOLICITUD];
         delete empresaData.tipo_solicitud;
         delete empresaData.notas_agente;
 
-        await addDoc(collection(db, 'empresas'), empresaData);
+        const empresaNormalizada = normalizeEmpresaData(empresaData);
+        await addDoc(collection(db, 'empresas'), empresaNormalizada);
         
         setMensaje('¡Empresa creada y activada exitosamente! (Visible en home, pendiente asignar credenciales)');
       } else {

@@ -267,21 +267,29 @@ export default function PerfilEmpresaPublica() {
             {/* Columna principal */}
             <div className="lg:col-span-2 space-y-8">
               {/* Descripción */}
-              {(empresa.descripcionCompleta || empresa.descripcion) && (
+              {(
+                empresa.descripcionCompleta || empresa.descripcion || empresa.descripcion_negocio ||
+                (empresa.perfil_publico && (empresa.perfil_publico.descripcion_detallada || empresa.perfil_publico.descripcion))
+              ) && (
                 <section className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">Acerca de Nosotros</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">
-                    {empresa.descripcionCompleta || empresa.descripcion}
+                    {empresa.descripcionCompleta || empresa.descripcion || empresa.descripcion_negocio ||
+                      (empresa.perfil_publico && (empresa.perfil_publico.descripcion_detallada || empresa.perfil_publico.descripcion))}
                   </p>
                 </section>
               )}
 
               {/* Servicios */}
-              {empresa.servicios && empresa.servicios.length > 0 && (
+              {(empresa.servicios && empresa.servicios.length > 0) ||
+                (empresa.perfil_publico && empresa.perfil_publico.servicios && empresa.perfil_publico.servicios.length > 0) && (
                 <section className="bg-white rounded-xl shadow-sm p-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">Nuestros Servicios</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {empresa.servicios.map((servicio, index) => (
+                    {(empresa.servicios && empresa.servicios.length > 0
+                      ? empresa.servicios
+                      : empresa.perfil_publico && empresa.perfil_publico.servicios
+                    ).map((servicio, index) => (
                       <div key={index} className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
                         <span className="text-blue-600 text-xl">✓</span>
                         <span className="font-medium text-gray-800">{servicio}</span>

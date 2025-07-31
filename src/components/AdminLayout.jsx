@@ -6,6 +6,7 @@ import DashboardLayout from "./DashboardLayout";
 import AdminPanel from "./AdminPanel";
 import AdminMarcas from "./AdminMarcas";
 import GestionEmpresas from "./GestionEmpresas";
+import EditarSolicitud from "./EditarSolicitud";
 import SolicitudesRegistro from "./SolicitudesRegistro";
 import GestionTiposEmpresa from "./GestionTiposEmpresa";
 import ListadoCampañasAdmin from "./ListadoCampañasAdmin";
@@ -51,6 +52,7 @@ export default function AdminLayout() {
         {/* Administración */}
         <Route path="empresas" element={<GestionEmpresas />} />
         <Route path="editar-empresa/:empresaId" element={<EditarEmpresaAdmin />} />
+        <Route path="editar-solicitud" element={<EditarSolicitud />} />
         <Route path="solicitudes-registro" element={<SolicitudesRegistro />} />
         <Route path="marcas" element={<AdminMarcas />} />
         <Route path="tipos-empresa" element={<GestionTiposEmpresa />} />

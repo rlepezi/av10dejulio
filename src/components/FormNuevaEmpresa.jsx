@@ -4,6 +4,16 @@ import { collection, addDoc, serverTimestamp, getDocs } from "firebase/firestore
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthProvider";
 
+// Importar utilidades de estandarización
+import { 
+  CAMPOS_EMPRESA, 
+  CAMPOS_REPRESENTANTE, 
+  ESTADOS_EMPRESA,
+  createEmpresaTemplate,
+  normalizeEmpresaData,
+  validateEmpresaData
+} from '../utils/empresaStandards';
+
 const regiones = [
   "Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama", "Coquimbo", "Valparaíso",
   "Metropolitana", "O'Higgins", "Maule", "Ñuble", "Biobío", "La Araucanía",

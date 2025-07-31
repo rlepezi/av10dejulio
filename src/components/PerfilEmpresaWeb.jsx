@@ -3,7 +3,16 @@ import React, { useState } from 'react';
 export default function PerfilEmpresaWeb({ empresa, onUpdate }) {
   const [perfilData, setPerfilData] = useState({
     descripcionCompleta: empresa.descripcionCompleta || '',
-    servicios: empresa.servicios || [],
+    servicios:
+      empresa.servicios && empresa.servicios.length > 0
+        ? empresa.servicios
+        : empresa.servicios_completos && empresa.servicios_completos.length > 0
+        ? empresa.servicios_completos
+        : empresa.categorias_servicios && empresa.categorias_servicios.length > 0
+        ? empresa.categorias_servicios
+        : empresa.datos_solicitud?.servicios && empresa.datos_solicitud.servicios.length > 0
+        ? empresa.datos_solicitud.servicios
+        : [],
     galeria: empresa.galeria || [],
     contactoAdicional: empresa.contactoAdicional || {
       whatsapp: '',

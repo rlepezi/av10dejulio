@@ -38,38 +38,29 @@ export default function PerfilEmpresaPublico() {
     }
   };
 
+  const getImagePath = (imagePath) => {
+    if (!imagePath) return '';
+    if (imagePath.startsWith('http')) return imagePath;
+    return `/images/${imagePath}`;
+  };
+
   const formatearHorarios = () => {
     if (!empresa?.horarios) return 'Horarios no disponibles';
     
-    const diasActivos = Object.entries(empresa.horarios)
-      .filter(([_, horario]) => horario.activo)
-      .map(([dia, horario]) => ({
-        dia: dia.charAt(0).toUpperCase() + dia.slice(1),
-        horario: `${horario.inicio} - ${horario.fin}`
-      }));
+    const nombresDias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
     
-    if (diasActivos.length === 0) return 'Actualmente cerrado';
-
-    // Agrupar días consecutivos con el mismo horario
-    const grupos = [];
-    let grupoActual = { dias: [diasActivos[0].dia], horario: diasActivos[0].horario };
-
-    for (let i = 1; i < diasActivos.length; i++) {
-      if (diasActivos[i].horario === grupoActual.horario) {
-        grupoActual.dias.push(diasActivos[i].dia);
-      } else {
-        grupos.push(grupoActual);
-        grupoActual = { dias: [diasActivos[i].dia], horario: diasActivos[i].horario };
+    return diasSemana.map((dia, index) => {
+      const horario = empresa.horarios[dia];
+      if (!horario || !horario.abierto) {
+        return `${nombresDias[index]}: Cerrado`;
       }
-    }
-    grupos.push(grupoActual);
-
-    return grupos.map(grupo => {
-      const diasTexto = grupo.dias.length === 1 
-        ? grupo.dias[0]
-        : `${grupo.dias[0]} a ${grupo.dias[grupo.dias.length - 1]}`;
-      return `${diasTexto}: ${grupo.horario}`;
-    }).join(' | ');
+      if (horario.turno_continuo) {
+        return `${nombresDias[index]}: ${horario.apertura} - ${horario.cierre}`;
+      } else {
+        return `${nombresDias[index]}: ${horario.apertura}-${horario.descanso_inicio} | ${horario.descanso_fin}-${horario.cierre}`;
+      }
+    }).join('\n');
   };
 
   if (loading) {
@@ -107,26 +98,41 @@ export default function PerfilEmpresaPublico() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header de la empresa */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white relative">
+        {/* Imagen de fondo del local si existe */}
+        {empresa.imagenLocal && (
+          <div className="absolute inset-0 opacity-20">
+            <img 
+              src={getImagePath(empresa.imagenLocal)} 
+              alt="Local"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+        
+        <div className="relative max-w-6xl mx-auto px-4 py-12">
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {/* Logo destacado */}
             {empresa.logo && (
               <div className="flex-shrink-0">
                 <img 
-                  src={empresa.logo} 
-                  alt={`Logo de ${empresa.nombre}`}
-                  className="w-24 h-24 md:w-32 md:h-32 bg-white rounded-lg p-3 object-contain shadow-lg"
+                  src={getImagePath(empresa.logo)} 
+                  alt={empresa.nombre}
+                  className="w-40 h-40 bg-white rounded-xl p-4 object-contain shadow-2xl border-4 border-white"
                 />
               </div>
             )}
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">{empresa.nombre}</h1>
+            
+            <div className="text-center md:text-left flex-1">
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 drop-shadow-lg">{empresa.nombre}</h1>
               {empresa.categoria && (
-                <p className="text-blue-100 text-lg mb-3">{empresa.categoria}</p>
+                <p className="text-xl text-blue-100 mb-4 drop-shadow">{empresa.categoria}</p>
               )}
-              <div className="flex flex-wrap items-center gap-4 text-sm md:text-base">
+              
+              {/* Información de contacto destacada */}
+              <div className="flex flex-wrap justify-center md:justify-start gap-4 text-sm mb-6">
                 {empresa.telefono && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-blue-700 bg-opacity-50 px-4 py-2 rounded-full backdrop-blur-sm">
                     <span>📞</span>
                     <a href={`tel:${empresa.telefono}`} className="hover:underline">
                       {empresa.telefono}
@@ -134,19 +140,26 @@ export default function PerfilEmpresaPublico() {
                   </div>
                 )}
                 {empresa.email && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-blue-700 bg-opacity-50 px-4 py-2 rounded-full backdrop-blur-sm">
                     <span>📧</span>
-                    <a href={`mailto:${empresa.email}`} className="hover:underline">
+                    <a href={`mailto:${empresa.email}`} className="hover:underline truncate">
                       {empresa.email}
                     </a>
                   </div>
                 )}
                 {empresa.direccion && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-blue-700 bg-opacity-50 px-4 py-2 rounded-full backdrop-blur-sm">
                     <span>📍</span>
-                    <span>{empresa.direccion}</span>
+                    <span className="truncate">{empresa.direccion}</span>
                   </div>
                 )}
+              </div>
+              
+              {/* Estado de la empresa */}
+              <div className="flex justify-center md:justify-start">
+                <span className="bg-green-500 bg-opacity-80 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                  ✅ Empresa Verificada
+                </span>
               </div>
             </div>
           </div>
@@ -170,28 +183,27 @@ export default function PerfilEmpresaPublico() {
 
             {/* Servicios */}
             {empresa.servicios && empresa.servicios.length > 0 && (
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Nuestros Servicios</h2>
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Nuestros Servicios</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {empresa.servicios.map((servicio, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                      <span className="text-blue-600 text-lg">✓</span>
-                      <span className="text-gray-800">{servicio}</span>
+                    <div key={index} className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                      <span className="text-blue-600 text-xl">✓</span>
+                      <span className="font-medium text-gray-800">{servicio}</span>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Características distintivas */}
-            {empresa.caracteristicas && empresa.caracteristicas.length > 0 && (
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-4">¿Por qué Elegirnos?</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {empresa.caracteristicas.map((caracteristica, index) => (
-                    <div key={index} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-                      <span className="text-green-600 text-lg">⭐</span>
-                      <span className="text-gray-800">{caracteristica}</span>
+            {/* Marcas que trabajamos */}
+            {empresa.marcas && empresa.marcas.length > 0 && (
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">🚗 Marcas que Trabajamos</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {empresa.marcas.map((marca, index) => (
+                    <div key={index} className="flex items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                      <span className="font-medium text-gray-700 text-center">{marca}</span>
                     </div>
                   ))}
                 </div>
@@ -200,17 +212,32 @@ export default function PerfilEmpresaPublico() {
 
             {/* Galería de fotos */}
             {empresa.galeria && empresa.galeria.length > 0 && (
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Nuestra Galería</h2>
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">📸 Nuestra Galería</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {empresa.galeria.map((foto, index) => (
-                    <div key={index} className="aspect-square rounded-lg overflow-hidden">
+                    <div key={index} className="aspect-square rounded-lg overflow-hidden shadow-sm">
                       <img 
-                        src={foto} 
+                        src={getImagePath(foto)} 
                         alt={`Foto ${index + 1} de ${empresa.nombre}`}
                         className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer"
-                        onClick={() => window.open(foto, '_blank')}
+                        onClick={() => window.open(getImagePath(foto), '_blank')}
                       />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Características distintivas */}
+            {empresa.caracteristicas && empresa.caracteristicas.length > 0 && (
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">⭐ ¿Por qué Elegirnos?</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {empresa.caracteristicas.map((caracteristica, index) => (
+                    <div key={index} className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                      <span className="text-green-600 text-xl">⭐</span>
+                      <span className="font-medium text-gray-800">{caracteristica}</span>
                     </div>
                   ))}
                 </div>
@@ -219,20 +246,20 @@ export default function PerfilEmpresaPublico() {
 
             {/* Testimonios */}
             {empresa.testimonios && empresa.testimonios.length > 0 && (
-              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Lo que Dicen Nuestros Clientes</h2>
+              <section className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">💬 Lo que Dicen Nuestros Clientes</h2>
                 <div className="space-y-4">
                   {empresa.testimonios.map((testimonio, index) => (
-                    <div key={index} className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                      <div className="flex items-center gap-1 mb-2">
+                    <div key={index} className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
+                      <div className="flex items-center gap-1 mb-3">
                         {[...Array(5)].map((_, i) => (
-                          <span key={i} className={`text-lg ${i < testimonio.rating ? 'text-yellow-500' : 'text-gray-300'}`}>
+                          <span key={i} className={`text-xl ${i < testimonio.rating ? 'text-yellow-500' : 'text-gray-300'}`}>
                             ⭐
                           </span>
                         ))}
                       </div>
-                      <p className="text-gray-700 italic mb-2">"{testimonio.comentario}"</p>
-                      <p className="text-gray-600 text-sm font-medium">- {testimonio.cliente}</p>
+                      <p className="text-gray-700 italic mb-3 text-lg">"{testimonio.comentario}"</p>
+                      <p className="text-gray-600 font-medium">- {testimonio.cliente}</p>
                     </div>
                   ))}
                 </div>
@@ -243,25 +270,31 @@ export default function PerfilEmpresaPublico() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Horarios */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📅 Horarios de Atención</h3>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span>�</span>
+                Horarios de Atención
+              </h3>
               <div className="space-y-2">
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <pre className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
                   {formatearHorarios()}
-                </p>
+                </pre>
               </div>
             </div>
 
             {/* Información de contacto */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">📞 Contacto</h3>
-              <div className="space-y-3">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span>📞</span>
+                Contacto
+              </h3>
+              <div className="space-y-4">
                 {empresa.telefono && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400">📱</span>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                    <span className="text-blue-600 text-xl">📱</span>
                     <div>
-                      <p className="text-sm text-gray-500">Teléfono</p>
-                      <a href={`tel:${empresa.telefono}`} className="text-blue-600 hover:underline">
+                      <p className="text-xs text-gray-500 uppercase font-semibold">Teléfono</p>
+                      <a href={`tel:${empresa.telefono}`} className="text-blue-600 hover:underline font-medium">
                         {empresa.telefono}
                       </a>
                     </div>
@@ -269,11 +302,11 @@ export default function PerfilEmpresaPublico() {
                 )}
                 
                 {empresa.email && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400">📧</span>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                    <span className="text-green-600 text-xl">📧</span>
                     <div>
-                      <p className="text-sm text-gray-500">Email</p>
-                      <a href={`mailto:${empresa.email}`} className="text-blue-600 hover:underline">
+                      <p className="text-xs text-gray-500 uppercase font-semibold">Email</p>
+                      <a href={`mailto:${empresa.email}`} className="text-green-600 hover:underline font-medium">
                         {empresa.email}
                       </a>
                     </div>
@@ -281,15 +314,15 @@ export default function PerfilEmpresaPublico() {
                 )}
 
                 {empresa.contactoAdicional?.whatsapp && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400">💬</span>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                    <span className="text-green-600 text-xl">💬</span>
                     <div>
-                      <p className="text-sm text-gray-500">WhatsApp</p>
+                      <p className="text-xs text-gray-500 uppercase font-semibold">WhatsApp</p>
                       <a 
                         href={`https://wa.me/${empresa.contactoAdicional.whatsapp.replace(/[^0-9]/g, '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-green-600 hover:underline"
+                        className="text-green-600 hover:underline font-medium"
                       >
                         {empresa.contactoAdicional.whatsapp}
                       </a>
@@ -298,11 +331,11 @@ export default function PerfilEmpresaPublico() {
                 )}
 
                 {empresa.direccion && (
-                  <div className="flex items-start gap-3">
-                    <span className="text-gray-400 mt-1">📍</span>
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <span className="text-gray-600 text-xl mt-1">📍</span>
                     <div>
-                      <p className="text-sm text-gray-500">Dirección</p>
-                      <p className="text-gray-700">{empresa.direccion}</p>
+                      <p className="text-xs text-gray-500 uppercase font-semibold">Dirección</p>
+                      <p className="text-gray-700 font-medium">{empresa.direccion}</p>
                       {empresa.contactoAdicional?.direccionCompleta && 
                        empresa.contactoAdicional.direccionCompleta !== empresa.direccion && (
                         <p className="text-gray-600 text-sm mt-1">
@@ -317,18 +350,21 @@ export default function PerfilEmpresaPublico() {
 
             {/* Redes sociales */}
             {(empresa.contactoAdicional?.facebook || empresa.contactoAdicional?.instagram || empresa.web) && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">🌐 Síguenos</h3>
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <span>🌐</span>
+                  Síguenos
+                </h3>
                 <div className="space-y-3">
                   {empresa.web && (
                     <a
                       href={empresa.web.startsWith('http') ? empresa.web : `https://${empresa.web}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
                     >
-                      <span className="text-blue-600">🌍</span>
-                      <span className="text-blue-600 hover:underline">Sitio Web</span>
+                      <span className="text-blue-600 text-xl">🌍</span>
+                      <span className="text-blue-600 hover:underline font-medium">Sitio Web</span>
                     </a>
                   )}
                   
@@ -337,10 +373,10 @@ export default function PerfilEmpresaPublico() {
                       href={`https://facebook.com/${empresa.contactoAdicional.facebook.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
                     >
-                      <span className="text-blue-600">📘</span>
-                      <span className="text-blue-600 hover:underline">Facebook</span>
+                      <span className="text-blue-600 text-xl">📘</span>
+                      <span className="text-blue-600 hover:underline font-medium">Facebook</span>
                     </a>
                   )}
                   
@@ -349,10 +385,10 @@ export default function PerfilEmpresaPublico() {
                       href={`https://instagram.com/${empresa.contactoAdicional.instagram.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
                     >
-                      <span className="text-pink-600">📷</span>
-                      <span className="text-pink-600 hover:underline">Instagram</span>
+                      <span className="text-pink-600 text-xl">📷</span>
+                      <span className="text-pink-600 hover:underline font-medium">Instagram</span>
                     </a>
                   )}
                 </div>

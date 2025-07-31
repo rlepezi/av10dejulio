@@ -48,7 +48,7 @@ export default function ResultadosUnificados({ resultados, loading }) {
 
   const renderEmpresa = (empresa) => (
     <div
-      key={empresa.id}
+      key={empresa.id || empresa.email_empresa}
       className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
       onClick={() => handleItemClick(empresa)}
     >
@@ -58,25 +58,18 @@ export default function ResultadosUnificados({ resultados, loading }) {
           <div className="flex items-center gap-2">
             <BuildingOfficeIcon className="w-5 h-5 text-blue-600" />
             <span className="text-sm font-medium text-blue-600">
-              {empresa.tipoEmpresa?.charAt(0).toUpperCase() + empresa.tipoEmpresa?.slice(1) || 'Empresa'}
+              {empresa.tipoEmpresa ? empresa.tipoEmpresa.charAt(0).toUpperCase() + empresa.tipoEmpresa.slice(1) : 'Empresa'}
             </span>
           </div>
-          
           <div className="flex gap-2">
             {empresa.origen === 'nuevo' && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                Nuevo
-              </span>
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Nuevo</span>
             )}
             {empresa.verificado && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                ✓ Verificado
-              </span>
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">✓ Verificado</span>
             )}
             {empresa.premium && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                ⭐ Premium
-              </span>
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">⭐ Premium</span>
             )}
           </div>
         </div>
@@ -86,11 +79,7 @@ export default function ResultadosUnificados({ resultados, loading }) {
           {/* Imagen o placeholder */}
           <div className="w-16 h-16 flex-shrink-0">
             {empresa.imagen ? (
-              <img
-                src={empresa.imagen}
-                alt={empresa.titulo}
-                className="w-full h-full object-cover rounded-lg"
-              />
+              <img src={empresa.imagen} alt={empresa.nombre_empresa} className="w-full h-full object-cover rounded-lg" />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg flex items-center justify-center">
                 <span className="text-2xl">🏪</span>
@@ -100,63 +89,36 @@ export default function ResultadosUnificados({ resultados, loading }) {
 
           {/* Información */}
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
-              {empresa.titulo}
-            </h3>
-            
-            {empresa.subtitulo && (
-              <p className="text-gray-600 text-sm mb-2 line-clamp-1">
-                {empresa.subtitulo}
-              </p>
-            )}
-
-            {empresa.descripcion && (
-              <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                <MapPinIcon className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">{empresa.descripcion}</span>
-              </div>
-            )}
-
-            {/* Rating si existe */}
-            {empresa.rating > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <StarIcon
-                      key={i}
-                      className={`w-4 h-4 ${
-                        i < Math.floor(empresa.rating)
-                          ? 'text-yellow-400 fill-current'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm text-gray-600">
-                  {empresa.rating.toFixed(1)}
-                </span>
-              </div>
-            )}
-
+            <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">{empresa.nombre_empresa}</h3>
+            <p className="text-gray-600 text-sm mb-1">RUT: {empresa.rut_empresa}</p>
+            <p className="text-gray-600 text-sm mb-1">Dirección: {empresa.direccion_empresa}, {empresa.comuna}, {empresa.region}</p>
+            <p className="text-gray-600 text-sm mb-1">Teléfono: {empresa.telefono_empresa}</p>
+            <p className="text-gray-600 text-sm mb-1">Email: {empresa.email_empresa}</p>
+            <p className="text-gray-600 text-sm mb-1">Rubro: {empresa.rubro}</p>
+            <p className="text-gray-600 text-sm mb-1">Tipo: {empresa.tipoEmpresa}</p>
+            <p className="text-gray-600 text-sm mb-1">Años de funcionamiento: {empresa.anos_funcionamiento}</p>
+            <p className="text-gray-600 text-sm mb-1">Empleados: {empresa.numero_empleados}</p>
+            <p className="text-gray-600 text-sm mb-1">Horario: {empresa.horario_atencion}</p>
+            <p className="text-gray-600 text-sm mb-1">Web: {empresa.web_actual}</p>
+            <p className="text-gray-600 text-sm mb-1">Descripción x: {empresa.descripcion_negocio}</p>
             {/* Categorías y marcas */}
-            <div className="flex flex-wrap gap-1">
-              {empresa.categorias?.slice(0, 2).map((categoria, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded"
-                >
-                  {categoria}
-                </span>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {empresa.categorias_servicios?.map((categoria, index) => (
+                <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">{categoria}</span>
               ))}
-              {empresa.marcas?.slice(0, 2).map((marca, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
-                >
-                  {marca}
-                </span>
+              {empresa.marcas_vehiculos?.map((marca, index) => (
+                <span key={index} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">{marca}</span>
               ))}
             </div>
+            {/* Redes sociales */}
+            {empresa.redes_sociales && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {empresa.redes_sociales.facebook && <a href={empresa.redes_sociales.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs underline">Facebook</a>}
+                {empresa.redes_sociales.instagram && <a href={empresa.redes_sociales.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-600 text-xs underline">Instagram</a>}
+                {empresa.redes_sociales.whatsapp && <span className="text-green-600 text-xs">WhatsApp: {empresa.redes_sociales.whatsapp}</span>}
+                {empresa.redes_sociales.tiktok && <a href={empresa.redes_sociales.tiktok} target="_blank" rel="noopener noreferrer" className="text-black text-xs underline">TikTok</a>}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -114,7 +114,9 @@ export default function ListadoProveedoresAdmin() {
     let items = [];
     
     if (filtros.mostrar === 'todos' || filtros.mostrar === 'empresas') {
-      items = [...items, ...proveedores];
+      // Solo empresas activas y normalizar tipoEmpresa
+      const empresasActivas = proveedores.filter(p => (p.estado || '').toLowerCase() === 'activa');
+      items = [...items, ...empresasActivas];
     }
     
     if (filtros.mostrar === 'todos' || filtros.mostrar === 'solicitudes') {
@@ -126,17 +128,18 @@ export default function ListadoProveedoresAdmin() {
   };
 
   const itemsFiltrados = todosLosItems().filter(item => {
-    if (filtros.estado && item.estado !== filtros.estado) return false;
+    if (filtros.estado && (item.estado || '').toLowerCase() !== filtros.estado.toLowerCase()) return false;
     if (filtros.busqueda) {
       const busqueda = filtros.busqueda.toLowerCase();
       return (
-        item.nombre?.toLowerCase().includes(busqueda) ||
-        item.nombre_empresa?.toLowerCase().includes(busqueda) ||
-        item.email?.toLowerCase().includes(busqueda) ||
-        item.email_empresa?.toLowerCase().includes(busqueda) ||
-        item.rut?.toLowerCase().includes(busqueda) ||
-        item.rut_empresa?.toLowerCase().includes(busqueda) ||
-        item.agente_nombre?.toLowerCase().includes(busqueda)
+        (item.nombre || '').toLowerCase().includes(busqueda) ||
+        (item.nombre_empresa || '').toLowerCase().includes(busqueda) ||
+        (item.email || '').toLowerCase().includes(busqueda) ||
+        (item.email_empresa || '').toLowerCase().includes(busqueda) ||
+        (item.rut || '').toLowerCase().includes(busqueda) ||
+        (item.rut_empresa || '').toLowerCase().includes(busqueda) ||
+        (item.agente_nombre || '').toLowerCase().includes(busqueda) ||
+        (item.tipoEmpresa || '').toLowerCase().includes(busqueda)
       );
     }
     return true;

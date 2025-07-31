@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -24,6 +24,15 @@ export default function GestionAgentes() {
   const [mostrandoModalClave, setMostrandoModalClave] = useState(false);
   const [agenteParaClave, setAgenteParaClave] = useState(null);
   const [nuevaClave, setNuevaClave] = useState('');
+
+  // Modal para asignar credenciales a agente existente
+  const [mostrandoModalCredenciales, setMostrandoModalCredenciales] = useState(false);
+  const [agenteParaCredenciales, setAgenteParaCredenciales] = useState(null);
+  const [credencialesForm, setCredencialesForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
 
   useEffect(() => {
     cargarAgentes();
@@ -108,6 +117,7 @@ export default function GestionAgentes() {
     });
   };
 
+  // CREAR AGENTE: AUTH + COLECCIÓN USUARIOS + COLECCIÓN AGENTES
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.nombre || !formData.email || (!editandoAgente && !formData.password)) {
@@ -133,64 +143,73 @@ export default function GestionAgentes() {
           fecha_actualizacion: new Date(),
           admin_responsable: user?.email
         };
-
         await updateDoc(doc(db, 'agentes', editandoAgente.id), agenteData);
         alert('Agente actualizado exitosamente');
       } else {
-        // Crear nuevo agente
-        // NOTA: En un entorno de producción, la creación de usuarios debería 
-        // hacerse a través de Firebase Admin SDK en el backend para no interferir 
-        // con la sesión del admin actual.
-        
-        // Por ahora, crearemos el registro del agente con las credenciales
-        // y mostraremos las instrucciones para que el agente se registre
-        
-        // Normalizar email
+        // CREAR USUARIO EN AUTH Y GUARDAR EN USUARIOS Y AGENTES
         const emailNormalizado = formData.email.trim().toLowerCase();
-        
+        let userCredential = null;
+        try {
+          userCredential = await createUserWithEmailAndPassword(getAuth(), emailNormalizado, formData.password);
+        } catch (authError) {
+          if (authError.code === 'auth/email-already-in-use') {
+            alert('Este email ya está registrado en autenticación. No se generará nuevo usuario, pero se agregará el agente.');
+            const auth = getAuth();
+            userCredential = auth.currentUser && auth.currentUser.email === emailNormalizado
+              ? { user: { uid: auth.currentUser.uid } }
+              : null;
+          } else {
+            throw authError;
+          }
+        }
+        // Crear documento en usuarios con el UID
+        if (userCredential && userCredential.user && userCredential.user.uid) {
+          await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
+            uid: userCredential.user.uid,
+            email: emailNormalizado,
+            rol: 'agente',
+            nombre: formData.nombre,
+            fecha_creacion: new Date(),
+            activo: true
+          }, { merge: true });
+        }
+        // Crear documento en agentes con el UID
         const agenteData = {
           nombre: formData.nombre,
           email: emailNormalizado,
           telefono: formData.telefono,
           zona_asignada: formData.zona_asignada,
           rol: 'agente',
-          activo: formData.activo,
+          activo: true,
           fecha_creacion: new Date(),
           admin_creador: user?.email,
-          password_temporal: formData.password, // Guardar para mostrar al admin
-          requiere_registro: true, // Indica que el agente debe registrarse
+          password_temporal: formData.password,
+          requiere_registro: false,
           permisos: {
             crear_solicitudes: true,
             activar_empresas: true,
             gestionar_perfil: true
-          }
+          },
+          uid_auth: userCredential?.user?.uid || null
         };
-
-        const agenteRef = await addDoc(collection(db, 'agentes'), agenteData);
-        
-        // También crear registro en la colección usuarios con estado pendiente
-        await addDoc(collection(db, 'usuarios'), {
-          email: emailNormalizado,
-          nombre: formData.nombre,
-          rol: 'agente',
-          estado: 'pendiente_registro', // El agente debe completar el registro
-          fecha_creacion: new Date(),
-          agente_id: agenteRef.id
-        });
-
-        alert(`✅ Agente creado exitosamente!\n\n📋 CREDENCIALES PARA EL AGENTE:\n👤 Email: ${emailNormalizado}\n🔑 Contraseña: ${formData.password}\n\n⚠️ INSTRUCCIONES:\n• Envía estas credenciales al agente\n• El agente debe registrarse en la plataforma con estos datos\n• Una vez registrado, podrá acceder a su panel\n\n📧 Email normalizado: ${emailNormalizado}`);
+        await addDoc(collection(db, 'agentes'), agenteData);
+        alert(`✅ Agente creado!\n\n📋 CREDENCIALES:\n👤 Email: ${emailNormalizado}\n🔑 Contraseña: ${formData.password}`);
       }
 
       await cargarAgentes();
       cerrarModal();
     } catch (error) {
-      console.error('Error guardando agente:', error);
+      console.error('Error guardando agente:', error, JSON.stringify(error));
+      let extra = '';
+      if (typeof error === 'object') {
+        extra = '\n' + JSON.stringify(error, null, 2);
+      }
       if (error.code === 'auth/email-already-in-use') {
-        alert('Este email ya está registrado en el sistema');
+        alert('Este email ya está registrado en el sistema' + extra);
       } else if (error.code === 'auth/weak-password') {
-        alert('La contraseña debe tener al menos 6 caracteres');
+        alert('La contraseña debe tener al menos 6 caracteres' + extra);
       } else {
-        alert('Error al guardar el agente: ' + error.message);
+        alert('Error al guardar el agente: ' + error.message + extra);
       }
     } finally {
       setProcesando(false);
@@ -205,6 +224,24 @@ export default function GestionAgentes() {
       });
       await cargarAgentes();
       alert(`Agente ${!agente.activo ? 'activado' : 'desactivado'} exitosamente`);
+
+      if (!agente.activo && (!agente.email || !agente.uid_auth)) {
+        let mensaje = '';
+        if (!agente.email) {
+          mensaje += 'Falta el email del agente. Por favor ingresa el email para asignar credenciales.\n';
+        }
+        if (!agente.uid_auth) {
+          mensaje += 'Falta la contraseña. Por favor ingresa y confirma la contraseña para el agente.';
+        }
+        alert(mensaje);
+        setAgenteParaCredenciales(agente);
+        setCredencialesForm({
+          email: agente.email || '',
+          password: '',
+          confirmPassword: ''
+        });
+        setMostrandoModalCredenciales(true);
+      }
     } catch (error) {
       console.error('Error cambiando estado del agente:', error);
       alert('Error al cambiar el estado del agente');
@@ -237,8 +274,12 @@ export default function GestionAgentes() {
   };
 
   const generarClaveParaAgente = () => {
-    const nuevaClave = generarPasswordSegura();
-    setNuevaClave(nuevaClave);
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    setNuevaClave(password);
   };
 
   const cambiarClaveAgente = async () => {
@@ -249,22 +290,106 @@ export default function GestionAgentes() {
 
     try {
       setProcesando(true);
-      
-      // Actualizar la contraseña temporal en el registro del agente
+
       await updateDoc(doc(db, 'agentes', agenteParaClave.id), {
         password_temporal: nuevaClave,
         ultima_actualizacion_clave: new Date(),
         admin_que_cambio_clave: user?.email,
-        requiere_cambio_clave: true // Flag para indicar que debe cambiar su contraseña
+        requiere_cambio_clave: true
       });
 
       alert(`✅ Nueva contraseña temporal asignada para ${agenteParaClave.nombre}:\n\n📧 Email: ${agenteParaClave.email}\n🔑 Nueva contraseña: ${nuevaClave}\n\n⚠️ IMPORTANTE:\n• El agente debe usar esta nueva contraseña en su próximo acceso\n• Si ya está registrado, debe cambiar su contraseña desde su perfil\n• Si no está registrado, debe usar /registro-agente con estas credenciales`);
-      
+
       await cargarAgentes();
       cerrarModalClave();
     } catch (error) {
       console.error('Error cambiando clave:', error);
       alert('Error al cambiar la clave del agente');
+    } finally {
+      setProcesando(false);
+      setCredencialesForm({ email: '', password: '', confirmPassword: '' });
+    }
+  };
+
+  const generarPasswordAleatoria = () => {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    setCredencialesForm(prev => ({
+      ...prev,
+      password,
+      confirmPassword: password
+    }));
+  };
+
+  const cerrarModalCredenciales = () => {
+    setMostrandoModalCredenciales(false);
+    setAgenteParaCredenciales(null);
+    setCredencialesForm({ email: '', password: '', confirmPassword: '' });
+  };
+
+  // ASIGNAR CREDENCIALES: AUTH + USUARIOS + AGENTES
+  const asignarCredencialesAgente = async () => {
+    if (!credencialesForm.email || !credencialesForm.password) {
+      alert('Todos los campos son obligatorios');
+      return;
+    }
+    if (credencialesForm.password !== credencialesForm.confirmPassword) {
+      alert('Las contraseñas no coinciden');
+      return;
+    }
+    if (credencialesForm.password.length < 6) {
+      alert('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    try {
+      setProcesando(true);
+      let userCredential = null;
+      try {
+        userCredential = await createUserWithEmailAndPassword(getAuth(), credencialesForm.email.trim().toLowerCase(), credencialesForm.password);
+      } catch (authError) {
+        if (authError.code === 'auth/email-already-in-use') {
+          console.warn('El usuario ya existe en Firebase Auth, se asignarán credenciales igualmente.');
+          const auth = getAuth();
+          userCredential = auth.currentUser && auth.currentUser.email === credencialesForm.email.trim().toLowerCase()
+            ? { user: { uid: auth.currentUser.uid } }
+            : null;
+        } else {
+          throw authError;
+        }
+      }
+      // Crear documento en Firestore 'usuarios' para el nuevo agente
+      if (userCredential && userCredential.user && userCredential.user.uid) {
+        await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          email: credencialesForm.email.trim().toLowerCase(),
+          rol: 'agente',
+          nombre: agenteParaCredenciales?.nombre || '',
+          fecha_creacion: new Date(),
+          activo: true
+        }, { merge: true });
+      }
+      // Actualizar agente en Firestore con credenciales y uid_auth
+      await updateDoc(doc(db, 'agentes', agenteParaCredenciales.id), {
+        email: credencialesForm.email.trim().toLowerCase(),
+        password_temporal: credencialesForm.password,
+        uid_auth: userCredential?.user?.uid || null,
+        fecha_credenciales_asignadas: new Date(),
+        admin_credenciales: user?.email
+      });
+      alert(
+        `Credenciales asignadas exitosamente.\n\n` +
+        `Email: ${credencialesForm.email}\n` +
+        `Contraseña: ${credencialesForm.password}\n\n` +
+        `El agente ya puede acceder a su panel de gestión.`
+      );
+      await cargarAgentes();
+      cerrarModalCredenciales();
+    } catch (error) {
+      console.error('Error asignando credenciales:', error);
+      alert('Error al asignar credenciales: ' + error.message);
     } finally {
       setProcesando(false);
     }
@@ -289,14 +414,13 @@ export default function GestionAgentes() {
 
   return (
     <div className="p-6">
+      {/* Estadísticas */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Gestión de Agentes de Campo</h2>
         <p className="text-gray-600">
           Administra los agentes que pueden crear solicitudes y activar empresas en terreno
         </p>
       </div>
-
-      {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-blue-800">{estadisticas.total}</div>
@@ -311,8 +435,6 @@ export default function GestionAgentes() {
           <div className="text-red-600 text-sm">Agentes Inactivos</div>
         </div>
       </div>
-
-      {/* Botón agregar */}
       <div className="mb-6">
         <button
           onClick={() => abrirModal()}
@@ -321,8 +443,6 @@ export default function GestionAgentes() {
           ➕ Agregar Nuevo Agente
         </button>
       </div>
-
-      {/* Lista de agentes */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full">
@@ -399,6 +519,53 @@ export default function GestionAgentes() {
                       >
                         Eliminar
                       </button>
+                      {!agente.uid_auth && (
+                        <button
+                          onClick={async () => {
+                            if (!agente.email || !agente.password_temporal) {
+                              alert('Faltan email o contraseña temporal para crear el usuario');
+                              return;
+                            }
+                            try {
+                              let userCredential = null;
+                              try {
+                                userCredential = await createUserWithEmailAndPassword(getAuth(), agente.email.trim().toLowerCase(), agente.password_temporal);
+                              } catch (authError) {
+                                if (authError.code === 'auth/email-already-in-use') {
+                                  console.warn('El usuario ya existe en Firebase Auth, se asignará uid_auth igualmente.');
+                                  const auth = getAuth();
+                                  userCredential = auth.currentUser && auth.currentUser.email === agente.email.trim().toLowerCase()
+                                    ? { user: { uid: auth.currentUser.uid } }
+                                    : null;
+                                } else {
+                                  throw authError;
+                                }
+                              }
+                              if (userCredential && userCredential.user && userCredential.user.uid) {
+                                await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
+                                  uid: userCredential.user.uid,
+                                  email: agente.email.trim().toLowerCase(),
+                                  rol: 'agente',
+                                  nombre: agente.nombre || '',
+                                  fecha_creacion: new Date(),
+                                  activo: true
+                                }, { merge: true });
+                              }
+                              await updateDoc(doc(db, 'agentes', agente.id), {
+                                uid_auth: userCredential?.user?.uid || null
+                              });
+                              alert('Usuario en Auth y colección usuarios generado correctamente');
+                              await cargarAgentes();
+                            } catch (error) {
+                              alert('Error al crear usuario en Auth: ' + error.message);
+                            }
+                          }}
+                          className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
+                          title="Activar usuario en Firebase Auth"
+                        >
+                          Activar usuario
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -427,7 +594,6 @@ export default function GestionAgentes() {
             <h3 className="text-lg font-semibold mb-4">
               {editandoAgente ? 'Editar Agente' : 'Agregar Nuevo Agente'}
             </h3>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -441,7 +607,6 @@ export default function GestionAgentes() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email *
@@ -452,10 +617,9 @@ export default function GestionAgentes() {
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                  disabled={editandoAgente} // No permitir cambiar email en edición
+                  disabled={editandoAgente}
                 />
               </div>
-
               {!editandoAgente && (
                 <div className="space-y-4">
                   <div>
@@ -485,7 +649,6 @@ export default function GestionAgentes() {
                       El agente podrá iniciar sesión inmediatamente con estas credenciales
                     </p>
                   </div>
-
                   {formData.password && formData.password.length >= 6 && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <h4 className="font-medium text-green-800 mb-2">✅ Credenciales listas</h4>
@@ -500,7 +663,6 @@ export default function GestionAgentes() {
                   )}
                 </div>
               )}
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Teléfono
@@ -512,7 +674,6 @@ export default function GestionAgentes() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Zona asignada
@@ -525,7 +686,6 @@ export default function GestionAgentes() {
                   placeholder="Ej: Santiago Centro, Las Condes, etc."
                 />
               </div>
-
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -538,7 +698,6 @@ export default function GestionAgentes() {
                   Agente activo
                 </label>
               </div>
-
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
@@ -560,8 +719,6 @@ export default function GestionAgentes() {
           </div>
         </div>
       )}
-
-      {/* Información sobre permisos */}
       <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="font-medium text-blue-900 mb-2">🔐 Permisos de los Agentes:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
@@ -571,8 +728,6 @@ export default function GestionAgentes() {
           <li>• Ver empresas de su zona</li>
         </ul>
       </div>
-
-      {/* Modal para cambiar contraseña */}
       {mostrandoModalClave && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -580,7 +735,6 @@ export default function GestionAgentes() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 🔑 Cambiar Contraseña - {agenteParaClave?.nombre}
               </h3>
-              
               <div className="space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
@@ -588,7 +742,6 @@ export default function GestionAgentes() {
                     <strong>Email:</strong> {agenteParaClave?.email}
                   </p>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Nueva Contraseña *
@@ -612,7 +765,6 @@ export default function GestionAgentes() {
                     </button>
                   </div>
                 </div>
-
                 {nuevaClave && nuevaClave.length >= 6 && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                     <p className="text-sm text-green-800 mb-2">
@@ -624,7 +776,6 @@ export default function GestionAgentes() {
                     </div>
                   </div>
                 )}
-
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <p className="text-sm text-yellow-800">
                     ⚠️ <strong>Importante:</strong> Envía las nuevas credenciales al agente de forma segura.
@@ -632,7 +783,6 @@ export default function GestionAgentes() {
                   </p>
                 </div>
               </div>
-
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={cerrarModalClave}
@@ -649,6 +799,98 @@ export default function GestionAgentes() {
                   {procesando ? 'Cambiando...' : 'Cambiar Contraseña'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {mostrandoModalCredenciales && agenteParaCredenciales && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">
+                Asignar Credenciales: {agenteParaCredenciales.nombre}
+              </h3>
+              <button
+                onClick={cerrarModalCredenciales}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-blue-800 text-sm">
+                <strong>Segunda etapa del proceso:</strong><br/>
+                Asigna un email y contraseña para que el agente pueda acceder a su panel y gestionar su información.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email de acceso
+                </label>
+                <input
+                  type="email"
+                  value={credencialesForm.email}
+                  onChange={(e) => setCredencialesForm(prev => ({...prev, email: e.target.value}))}
+                  placeholder="email@agente.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Recomendado: usar el email del agente
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contraseña
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={credencialesForm.password}
+                    onChange={(e) => setCredencialesForm(prev => ({...prev, password: e.target.value}))}
+                    placeholder="Contraseña"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={generarPasswordAleatoria}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                  >
+                    🎲 Generar
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar contraseña
+                </label>
+                <input
+                  type="text"
+                  value={credencialesForm.confirmPassword}
+                  onChange={(e) => setCredencialesForm(prev => ({...prev, confirmPassword: e.target.value}))}
+                  placeholder="Confirmar contraseña"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              {credencialesForm.password && credencialesForm.password !== credencialesForm.confirmPassword && (
+                <p className="text-red-600 text-sm">Las contraseñas no coinciden</p>
+              )}
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={cerrarModalCredenciales}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                disabled={procesando}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={asignarCredencialesAgente}
+                disabled={procesando || !credencialesForm.email || !credencialesForm.password || credencialesForm.password !== credencialesForm.confirmPassword}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+              >
+                {procesando ? 'Asignando...' : '🔑 Asignar Credenciales'}
+              </button>
             </div>
           </div>
         </div>

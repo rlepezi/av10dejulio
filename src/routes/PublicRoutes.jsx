@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 
 // Páginas públicas
 import HomePage from '../pages/HomePage';
+import TestRegistroEmpresaPage from '../pages/TestRegistroEmpresaPage';
 import LoginPage from '../components/LoginPage';
 import ProductDetailPage from '../pages/ProductDetailPage';
 import ContactPage from '../pages/ContactPage';
@@ -14,6 +15,7 @@ import MasInformacionProveedorPage from '../pages/MasInformacionProveedorPage';
 import UserTicketsPage from '../pages/UserTicketsPage';
 import PerfilEmpresaPublica from '../pages/PerfilEmpresaPublica';
 import PerfilEmpresaPublico from '../pages/PerfilEmpresaPublico';
+import ActualizarEmpresaTemp from '../components/ActualizarEmpresaTemp';
 
 // Servicios públicos
 import ServicioSeguros from '../components/ServicioSeguros';
@@ -62,6 +64,11 @@ const PublicRoutes = () => {
       
       {/* Solicitudes públicas */}
       <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />
+      
+      {/* Ruta temporal para actualizar empresa */}
+      <Route path="/temp-update" element={<ActualizarEmpresaTemp />} />
+      {/* Ruta de prueba para formulario validado */}
+      <Route path="/test-registro-empresa" element={<TestRegistroEmpresaPage />} />
     </Routes>
   );
 };

@@ -54,7 +54,7 @@ const GestionTiposEmpresa = () => {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
-      query(collection(db, "empresas"), where('estado', '==', 'Activa')),
+      query(collection(db, "empresas"), where('estado', '==', 'activa')),
       (snapshot) => {
         const empresasData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -72,13 +72,15 @@ const GestionTiposEmpresa = () => {
     const stats = {};
     
     Object.keys(tiposEmpresa).forEach(tipo => {
-      stats[tipo] = empresasData.filter(empresa => 
-        empresa.tipoEmpresa === tipo || 
-        (tipo === 'local' && empresa.esLocal) ||
-        (tipo === 'pyme' && empresa.esPyme) ||
-        (tipo === 'emprendimiento' && empresa.esEmprendimiento) ||
-        (tipo === 'premium' && empresa.esPremium)
-      ).length;
+      stats[tipo] = empresasData.filter(empresa => {
+        // Normalizar a minúsculas para evitar problemas de mayúsculas/minúsculas
+        const tipoEmpresa = (empresa.tipoEmpresa || '').toLowerCase();
+        return tipoEmpresa === tipo || 
+          (tipo === 'local' && empresa.esLocal) ||
+          (tipo === 'pyme' && empresa.esPyme) ||
+          (tipo === 'emprendimiento' && empresa.esEmprendimiento) ||
+          (tipo === 'premium' && empresa.esPremium);
+      }).length;
     });
     
     stats.total = empresasData.length;
@@ -130,8 +132,10 @@ const GestionTiposEmpresa = () => {
   const empresasFiltradas = empresas.filter(empresa => {
     if (filtroTipo === 'todos') return true;
     if (filtroTipo === 'sinTipo') return !empresa.tipoEmpresa;
-    
-    return empresa.tipoEmpresa === filtroTipo ||
+
+    // Normalizar a minúsculas para evitar problemas de mayúsculas/minúsculas
+    const tipoEmpresa = (empresa.tipoEmpresa || '').toLowerCase();
+    return tipoEmpresa === filtroTipo ||
            (filtroTipo === 'local' && empresa.esLocal) ||
            (filtroTipo === 'pyme' && empresa.esPyme) ||
            (filtroTipo === 'emprendimiento' && empresa.esEmprendimiento) ||

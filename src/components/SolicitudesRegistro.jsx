@@ -2,6 +2,8 @@ import React from 'react';
 import { useAuth } from './AuthProvider';
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
+import { auth } from '../firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy } from 'firebase/firestore';
 
 // Utilidad recursiva para mostrar todos los campos y tipos
@@ -535,8 +537,36 @@ export default function SolicitudesRegistro() {
 
     try {
       setProcesando(true);
-      
-      // 1. Actualizar la solicitud a estado "credenciales_asignadas"
+
+      // 1. Crear usuario en Firebase Auth
+      let userCredential = null;
+      try {
+        userCredential = await createUserWithEmailAndPassword(auth, credencialesForm.email, credencialesForm.password);
+      } catch (authError) {
+        if (authError.code === 'auth/email-already-in-use') {
+          // Si el usuario ya existe, continuar con la asignación de credenciales
+          console.warn('El usuario ya existe en Firebase Auth, se asignarán credenciales igualmente.');
+        } else {
+          throw authError;
+        }
+      }
+
+      // 1b. Crear documento en Firestore 'usuarios' para el nuevo usuario
+      let nuevoUid = null;
+      if (userCredential && userCredential.user) {
+        nuevoUid = userCredential.user.uid;
+        const nuevoUsuario = {
+          uid: nuevoUid,
+          email: credencialesForm.email,
+          rol: 'empresa', // o 'proveedor', según tu lógica
+          nombre_empresa: credencialesForm.nombre_empresa || '',
+          fecha_creacion: new Date(),
+          activo: true
+        };
+        await addDoc(collection(db, 'usuarios'), nuevoUsuario);
+      }
+
+      // 2. Actualizar la solicitud a estado "credenciales_asignadas"
       await updateDoc(doc(db, 'solicitudes_empresa', solicitudId), {
         estado: 'credenciales_asignadas',
         fecha_credenciales_asignadas: new Date(),
@@ -547,11 +577,11 @@ export default function SolicitudesRegistro() {
         }
       });
 
-      // 2. Buscar y actualizar la empresa correspondiente
+      // 3. Buscar y actualizar la empresa correspondiente
       const empresasRef = collection(db, 'empresas');
       const empresasQuery = query(empresasRef, where('solicitud_origen_id', '==', solicitudId));
       const empresasSnapshot = await getDocs(empresasQuery);
-      
+
       if (!empresasSnapshot.empty) {
         const empresaDoc = empresasSnapshot.docs[0];
         await updateDoc(empresaDoc.ref, {
@@ -562,20 +592,18 @@ export default function SolicitudesRegistro() {
             fecha_asignacion: new Date(),
             admin_asignador: user?.email
           },
-          fecha_credenciales_asignadas: new Date()
+          fecha_credenciales_asignadas: new Date(),
+          uid_auth: nuevoUid || null // <-- Guardar el UID generado por Auth
         });
       }
 
-      // 3. OPCIONAL: Crear usuario en Firebase Auth
-      // await createUserWithEmailAndPassword(auth, credencialesForm.email, credencialesForm.password);
-      
       alert(
         `Credenciales asignadas exitosamente.\n\n` +
         `Email: ${credencialesForm.email}\n` +
         `Contraseña: ${credencialesForm.password}\n\n` +
         `La empresa ya puede acceder a su panel de gestión.`
       );
-      
+
       await cargarSolicitudes();
       setMostrandoModalCredenciales(false);
       setCredencialesForm({ email: '', password: '', confirmPassword: '' });
@@ -1000,6 +1028,12 @@ export default function SolicitudesRegistro() {
                   Fecha
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Días
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Origen
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
@@ -1046,6 +1080,18 @@ export default function SolicitudesRegistro() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {solicitud.fecha_solicitud?.toDate?.()?.toLocaleDateString() || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {(() => {
+                      const fecha = solicitud.fecha_solicitud?.toDate?.() || solicitud.fecha_registro?.toDate?.();
+                      if (!fecha) return 'N/A';
+                      const hoy = new Date();
+                      const diff = Math.floor((hoy - fecha) / (1000 * 60 * 60 * 24));
+                      return diff + ' días';
+                    })()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {solicitud.origen || solicitud.datos_solicitud?.origen || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                     <button

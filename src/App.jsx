@@ -9,6 +9,7 @@ import AuthProvider from "./components/AuthProvider";
 
 // Componentes principales
 import HomePage from "./pages/HomePage";
+import VisualizarSolicitud from "./components/VisualizarSolicitud";
 import LoginPage from "./components/LoginPage";
 import AdminLayout from "./components/AdminLayout";
 import DashboardSwitch from "./components/DashboardSwitch";
@@ -17,6 +18,7 @@ import AdminRoute from "./components/AdminRoute";
 
 // Componentes para rutas públicas principales
 import RegistroCliente from "./components/RegistroCliente";
+import RegistroAgente from "./components/RegistroAgente";
 import RegistroProveedor from "./components/RegistroProveedor";
 import SolicitudComunidad from "./components/SolicitudComunidad";
 import LocalProvidersPage from "./pages/LocalProvidersPage";
@@ -65,6 +67,7 @@ function App() {
         });
 
         return () => unsubscribeUserData();
+// ...otros imports...
       } else {
         setUserData(null);
         setIsLoading(false);
@@ -109,6 +112,9 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+
+            {/* Visualización de solicitud individual en dashboard */}
+            <Route path="/dashboard/visualizar-solicitud/:id" element={<VisualizarSolicitud />} />
             
             {/* Rutas de administración */}
             <Route
@@ -131,6 +137,7 @@ function App() {
             <Route path="/area-cliente" element={<AreaClientePage />} />
             <Route path="/recursos" element={<EducationalResourcesPage />} />
             <Route path="/recursos/:resourceId" element={<ResourceDetailPage />} />
+            <Route path="/registro-agente" element={<RegistroAgente />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/contacto" element={<ContactPage />} />
             

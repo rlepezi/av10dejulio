@@ -35,12 +35,13 @@ export default function HeaderMenu() {
   // Proveedores: envía al Dashboard correcto según el rol
   const handleProveedoresClick = () => {
     closeAllMenus();
-    
+    // Si el usuario es admin, va al panel admin
     if (rol === "admin") {
       navigate("/admin");
     } else if (rol === "proveedor") {
       navigate("/dashboard/proveedor");
     } else {
+      // Para usuarios no autenticados o con rol distinto, navegar a /proveedores
       navigate("/proveedores");
     }
   };

@@ -18,7 +18,7 @@ const FeaturedProviders = ({ title = "🌟 Proveedores Destacados" }) => {
       // Obtener proveedores locales, PyMEs y emprendimientos
       const q = query(
         collection(db, 'empresas'),
-        where('estado', '==', 'Activa'),
+        where('estado', '==', 'activa'),
         orderBy('fechaRegistro', 'desc'),
         limit(8)
       );

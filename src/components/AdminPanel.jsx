@@ -38,10 +38,10 @@ function AdminPanel({ user }) {
         const solicitudesEmpresaSnapshot = await getDocs(solicitudesEmpresaQuery);
         console.log('📋 Solicitudes empresa pendientes:', solicitudesEmpresaSnapshot.size);
         
-        // Solicitudes de proveedores (colección unificada)
+        // Solicitudes de proveedores (colección adicional)
         const solicitudesProveedorQuery = query(
-          collection(db, 'solicitudes_empresa'),
-          where('estado', 'in', ['pendiente', 'en_revision'])
+          collection(db, 'solicitudes_proveedor'),
+          where('estado_general', 'in', ['enviada', 'en_revision'])
         );
         const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
         console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);
@@ -102,10 +102,10 @@ function AdminPanel({ user }) {
       const solicitudesEmpresaSnapshot = await getDocs(solicitudesEmpresaQuery);
       console.log('📋 Solicitudes empresa pendientes:', solicitudesEmpresaSnapshot.size);
       
-      // Solicitudes de proveedores (colección unificada)
+      // Solicitudes de proveedores (colección adicional)
       const solicitudesProveedorQuery = query(
-        collection(db, 'solicitudes_empresa'),
-        where('estado', 'in', ['pendiente', 'en_revision'])
+        collection(db, 'solicitudes_proveedor'),
+        where('estado_general', 'in', ['enviada', 'en_revision'])
       );
       const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
       console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);

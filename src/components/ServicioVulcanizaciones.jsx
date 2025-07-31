@@ -31,7 +31,7 @@ export default function ServicioVulcanizaciones() {
         collection(db, 'empresas'),
         where('rubro', '==', 'Vulcanización'),
         where('tipoEmpresa', '==', 'pyme'),
-        where('estado', '==', 'Activa')
+        where('estado', '==', 'activa')
       );
       const vulcanizadorasSnapshot = await getDocs(vulcanizadorasQuery);
       const empresasVulcanizacion = vulcanizadorasSnapshot.docs.map(doc => {
