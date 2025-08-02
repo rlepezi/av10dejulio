@@ -3,6 +3,7 @@ import { db, auth } from "./firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import EmpresaDetalleAgente from "./components/EmpresaDetalleAgente";
 
 // Providers
 import AuthProvider from "./components/AuthProvider";
@@ -15,6 +16,9 @@ import AdminLayout from "./components/AdminLayout";
 import DashboardSwitch from "./components/DashboardSwitch";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import DashboardAgente from "./components/DashboardAgente";
+import EmpresasAsignadasAgente from "./pages/EmpresasAsignadasAgente";
+import RegistrarEmpresaValidada from "./pages/RegistrarEmpresaValidada";
 
 // Componentes para rutas públicas principales
 import RegistroCliente from "./components/RegistroCliente";
@@ -67,7 +71,6 @@ function App() {
         });
 
         return () => unsubscribeUserData();
-// ...otros imports...
       } else {
         setUserData(null);
         setIsLoading(false);
@@ -127,6 +130,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
+            {/* Rutas de agente */}
+            <Route path="/dashboard/agente" element={<DashboardAgente />} />
+            <Route path="/agente/empresas-asignadas" element={<EmpresasAsignadasAgente />} />
+            <Route path="/agente/nueva-empresa" element={<RegistrarEmpresaValidada />} />
+            <Route path="/agente/empresa/:empresaId" element={<EmpresaDetalleAgente />} />
             
             {/* Rutas críticas para navegación desde HeroSection */}
             <Route path="/registro-cliente" element={<RegistroCliente />} />

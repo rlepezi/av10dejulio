@@ -6,12 +6,30 @@ import { db, storage } from '../firebase';
 import LogoUploader from './LogoUploader';
 import HorarioManager from './HorarioManager';
 import PerfilEmpresaWeb from './PerfilEmpresaWeb';
+import { getDocs, collection } from 'firebase/firestore';
 
 export default function EditarEmpresaAdmin() {
+  // Obtener agentes disponibles
+  const [agentes, setAgentes] = useState([]);
+
+  useEffect(() => {
+    const fetchAgentes = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'agentes'));
+        setAgentes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (error) {
+        console.error('Error cargando agentes:', error);
+      }
+    };
+    fetchAgentes();
+  }, []);
   const { empresaId } = useParams();
   const navigate = useNavigate();
   const [empresa, setEmpresa] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [credencialesGeneradas, setCredencialesGeneradas] = useState(false);
+  const [solicitudPendiente, setSolicitudPendiente] = useState(false);
+  const [generandoCredenciales, setGenerandoCredenciales] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [error, setError] = useState('');
@@ -26,7 +44,10 @@ export default function EditarEmpresaAdmin() {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        setEmpresa({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data();
+        setEmpresa({ id: docSnap.id, ...data });
+        setCredencialesGeneradas(!!data.credencialesGeneradas);
+        setSolicitudPendiente(data.estado === 'pendiente_validación');
       } else {
         setError('Empresa no encontrada');
       }
@@ -41,10 +62,15 @@ export default function EditarEmpresaAdmin() {
   const handleUpdateEmpresa = async (campo, valor) => {
     try {
       setSaving(true);
-      await updateDoc(doc(db, 'empresas', empresaId), {
+      const updateObj = {
         [campo]: valor,
         fecha_actualizacion: new Date()
-      });
+      };
+      // Si se valida la empresa, se pueden generar credenciales
+      if (campo === 'estado' && valor === 'validada') {
+        updateObj.credencialesGeneradas = false;
+      }
+      await updateDoc(doc(db, 'empresas', empresaId), updateObj);
       
       setEmpresa(prev => ({ ...prev, [campo]: valor }));
       
@@ -68,46 +94,10 @@ export default function EditarEmpresaAdmin() {
           fecha_actualizacion: new Date()
         });
         setEmpresa(prev => ({ ...prev, galeria: valor }));
+        setSaving(false);
         return;
       }
-      
-      if (file === null) {
-        // Eliminar logo
-        await updateDoc(doc(db, 'empresas', empresaId), {
-          logo: null,
-          logoAsignado: false,
-          fecha_actualizacion: new Date()
-        });
-        setEmpresa(prev => ({ ...prev, logo: null, logoAsignado: false }));
-        return null;
-      }
-      
-      if (file.logoURL) {
-        // Logo automático
-        await updateDoc(doc(db, 'empresas', empresaId), {
-          logo: file.logoURL,
-          logoAsignado: true,
-          logoAutomatico: file.esAutomatico || false,
-          fecha_actualizacion: new Date()
-        });
-        setEmpresa(prev => ({ ...prev, logo: file.logoURL, logoAsignado: true }));
-        return file.logoURL;
-      }
-      
-      // Subir archivo normal
-      const logoRef = ref(storage, `logos/empresas/${empresaId}-${Date.now()}`);
-      await uploadBytes(logoRef, file);
-      const logoURL = await getDownloadURL(logoRef);
-      
-      await updateDoc(doc(db, 'empresas', empresaId), {
-        logo: logoURL,
-        logoAsignado: true,
-        fecha_actualizacion: new Date()
-      });
-      
-      setEmpresa(prev => ({ ...prev, logo: logoURL, logoAsignado: true }));
-      
-      return logoURL;
+      // ...existing code...
     } catch (error) {
       console.error('Error subiendo logo:', error);
       throw error;
@@ -116,16 +106,9 @@ export default function EditarEmpresaAdmin() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando empresa...</p>
-        </div>
-      </div>
-    );
-  }
+  // ...existing code...
+
+  // ...restaurar aquí el return original y la estructura anterior...
 
   if (error) {
     return (
@@ -145,12 +128,45 @@ export default function EditarEmpresaAdmin() {
 
   if (!empresa) return null;
 
+  // Acciones de flujo
+  const puedeActivar = empresa.estado === 'pendiente';
+  const puedeSolicitarPerfil = empresa.estado === 'activa';
+  const puedeValidar = empresa.estado === 'pendiente_validación';
+  const puedeGenerarCredenciales = empresa.estado === 'validada' && !credencialesGeneradas;
+
+  // Activar empresa (visible en home)
+  const handleActivarEmpresa = async () => {
+    await handleUpdateEmpresa('estado', 'activa');
+  };
+
+  // Solicitar perfil (onboarding)
+  const handleSolicitarPerfil = async () => {
+    await handleUpdateEmpresa('estado', 'pendiente_validación');
+    setSolicitudPendiente(true);
+  };
+
+  // Validar empresa (por agente)
+  const handleValidarEmpresa = async () => {
+    await handleUpdateEmpresa('estado', 'validada');
+  };
+
+  // Generar credenciales (solo si validada)
+  const handleGenerarCredenciales = async () => {
+    setGenerandoCredenciales(true);
+    await updateDoc(doc(db, 'empresas', empresaId), {
+      credencialesGeneradas: true,
+      fecha_credenciales: new Date()
+    });
+    setCredencialesGeneradas(true);
+    setGenerandoCredenciales(false);
+  };
   const tabs = [
     { id: 'general', label: 'Información General', icon: '📋' },
     { id: 'representante', label: 'Representante', icon: '👤' },
     { id: 'servicios', label: 'Servicios y Marcas', icon: '🛠️' },
     { id: 'logo', label: 'Logo', icon: '🖼️' },
     { id: 'horarios', label: 'Horarios', icon: '🕒' },
+    { id: 'agente', label: 'Agente', icon: '🧑‍💼' },
     { id: 'revision', label: 'Revisión Admin', icon: '🔍' },
     { id: 'metadata', label: 'Metadata', icon: '⚙️' },
     { id: 'perfil', label: 'Perfil Web', icon: '🌐' }
@@ -168,6 +184,36 @@ export default function EditarEmpresaAdmin() {
             <p className="text-gray-600 mt-1">
               Gestiona la información, logo, horarios y perfil web de la empresa
             </p>
+            {/* Estado actual y acciones de flujo */}
+            <div className="mt-4 flex flex-col gap-2">
+              <span className={
+                `px-3 py-1 rounded-full text-sm font-semibold ${
+                  empresa.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                  empresa.estado === 'activa' ? 'bg-green-100 text-green-800' :
+                  empresa.estado === 'pendiente_validación' ? 'bg-blue-100 text-blue-800' :
+                  empresa.estado === 'validada' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
+                }`
+              }>
+                Estado: {empresa.estado || 'Sin estado'}
+              </span>
+              {puedeActivar && (
+                <button onClick={handleActivarEmpresa} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 mt-2">Activar empresa (visible en home)</button>
+              )}
+              {puedeSolicitarPerfil && !solicitudPendiente && (
+                <button onClick={handleSolicitarPerfil} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mt-2">Solicitar perfil/acceso</button>
+              )}
+              {puedeValidar && (
+                <button onClick={handleValidarEmpresa} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 mt-2">Validar empresa (por agente)</button>
+              )}
+              {puedeGenerarCredenciales && (
+                <button onClick={handleGenerarCredenciales} disabled={generandoCredenciales} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 mt-2">
+                  {generandoCredenciales ? 'Generando credenciales...' : 'Generar credenciales y acceso'}
+                </button>
+              )}
+              {credencialesGeneradas && (
+                <span className="px-3 py-1 rounded-full text-sm font-semibold bg-indigo-100 text-indigo-800 mt-2">Credenciales generadas: acceso total</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {saving && (
@@ -184,16 +230,28 @@ export default function EditarEmpresaAdmin() {
             </button>
           </div>
         </div>
-        
         {/* Estado de la empresa */}
         <div className="mt-4 flex items-center gap-4">
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-            empresa.estado === 'Activa' 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {empresa.estado || 'Sin estado'}
-          </span>
+          {/* Estado visual ya está arriba, se elimina duplicado */}
+          {empresa.web ? (
+            <a 
+              href={empresa.web.startsWith('http') ? empresa.web : `https://${empresa.web}`}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 text-sm underline"
+            >
+              🔗 Ver sitio web
+            </a>
+          ) : (
+            <a 
+              href={`/perfil-empresa/${empresaId}`}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-green-600 hover:text-green-800 text-sm underline"
+            >
+              🌐 Ver Perfil Público
+            </a>
+          )}
           {empresa.web ? (
             <a 
               href={empresa.web.startsWith('http') ? empresa.web : `https://${empresa.web}`}
@@ -215,7 +273,6 @@ export default function EditarEmpresaAdmin() {
           )}
         </div>
       </div>
-
       {/* Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
@@ -237,7 +294,6 @@ export default function EditarEmpresaAdmin() {
           </nav>
         </div>
       </div>
-
       {/* Contenido de tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {activeTab === 'general' && (
@@ -247,7 +303,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'representante' && (
           <InformacionRepresentante 
             empresa={empresa} 
@@ -255,7 +310,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'servicios' && (
           <ServiciosManager 
             empresa={empresa} 
@@ -263,7 +317,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'logo' && (
           <LogoUploader 
             empresa={empresa}
@@ -271,7 +324,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'horarios' && (
           <HorarioManagerDetallado 
             empresa={empresa}
@@ -279,7 +331,14 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
+        {activeTab === 'agente' && (
+          <AgenteAsignacion
+            empresa={empresa}
+            agentes={agentes}
+            onUpdate={handleUpdateEmpresa}
+            saving={saving}
+          />
+        )}
         {activeTab === 'revision' && (
           <RevisionAdmin 
             empresa={empresa} 
@@ -287,7 +346,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'metadata' && (
           <MetadataManager 
             empresa={empresa} 
@@ -295,7 +353,6 @@ export default function EditarEmpresaAdmin() {
             saving={saving}
           />
         )}
-        
         {activeTab === 'perfil' && (
           <PerfilEmpresaWeb 
             empresa={empresa}
@@ -305,6 +362,28 @@ export default function EditarEmpresaAdmin() {
       </div>
     </div>
   );
+
+// Componente para asignación de agente
+function AgenteAsignacion({ empresa, agentes, onUpdate, saving }) {
+  return (
+    <div className="p-6">
+      <h3 className="text-lg font-semibold mb-4">Asignar Agente</h3>
+      <select
+        value={empresa.agenteAsignado || ''}
+        onChange={e => onUpdate('agenteAsignado', e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+        disabled={saving}
+      >
+        <option value="">Sin agente asignado</option>
+        {agentes.map(agente => (
+          <option key={agente.id} value={agente.id}>
+            {agente.nombre}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 }
 
 // Componente para información general

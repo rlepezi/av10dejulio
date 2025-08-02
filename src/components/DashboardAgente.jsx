@@ -33,6 +33,79 @@ export default function DashboardAgente() {
   });
   const [showValidationForm, setShowValidationForm] = useState(false);
 
+
+  // --- NUEVO ESTADO Y FUNCIONES PARA EMPRESA VALIDADA POR AGENTE ---
+  const [showNewEmpresaForm, setShowNewEmpresaForm] = useState(false);
+  const [newEmpresa, setNewEmpresa] = useState({
+    nombre: '',
+    rut: '',
+    direccion: '',
+    ciudad: '',
+    region: '',
+    representante: '',
+    email: '',
+    telefono: ''
+  });
+  const [isSubmittingEmpresa, setIsSubmittingEmpresa] = useState(false);
+  const [errorNuevaEmpresa, setErrorNuevaEmpresa] = useState('');
+
+  const handleNewEmpresaChange = (e) => {
+    const { name, value } = e.target;
+    setNewEmpresa((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmitNuevaEmpresa = async (e) => {
+    e.preventDefault();
+    setErrorNuevaEmpresa('');
+    setIsSubmittingEmpresa(true);
+    try {
+      if (!newEmpresa.nombre || !newEmpresa.rut || !newEmpresa.direccion || !newEmpresa.ciudad || !newEmpresa.region || !newEmpresa.representante) {
+        setErrorNuevaEmpresa('Completa todos los campos obligatorios.');
+        setIsSubmittingEmpresa(false);
+        return;
+      }
+      const solicitud = {
+        nombre: newEmpresa.nombre,
+        rut: newEmpresa.rut,
+        direccion: newEmpresa.direccion,
+        ciudad: newEmpresa.ciudad,
+        region: newEmpresa.region,
+        representante: newEmpresa.representante,
+        email: newEmpresa.email,
+        telefono: newEmpresa.telefono,
+        origen: 'agente',
+        agente_creador_id: agente?.id,
+        agente_creador_nombre: agente?.nombre,
+        estado: 'activa',
+        validacion_agente: {
+          ubicacion_verificada: true,
+          documentos_validados: true,
+          establecimiento_operativo: true,
+          fecha_validacion: serverTimestamp(),
+          observaciones: 'Validación completa por agente.'
+        },
+        fecha_registro: serverTimestamp(),
+        tipoEmpresa: 'comunidad',
+        es_comunidad: true,
+        validado_por_agente: true
+      };
+      await addDoc(collection(db, 'solicitudes_empresa'), solicitud);
+      await updateDoc(doc(db, 'agentes', agente.id), {
+        empresasActivadas: (agente.empresasActivadas || 0) + 1,
+        visitasRealizadas: (agente.visitasRealizadas || 0) + 1,
+        fecha_ultima_actividad: serverTimestamp()
+      });
+      setShowNewEmpresaForm(false);
+      setNewEmpresa({ nombre: '', rut: '', direccion: '', ciudad: '', region: '', representante: '', email: '', telefono: '' });
+      alert('Empresa validada y registrada exitosamente.');
+      loadAgenteData();
+    } catch (err) {
+      setErrorNuevaEmpresa('Error al registrar la empresa.');
+    } finally {
+      setIsSubmittingEmpresa(false);
+    }
+  };
+
   useEffect(() => {
     if (user && rol === 'agente') {
       loadAgenteData();
@@ -309,6 +382,68 @@ export default function DashboardAgente() {
             </div>
           </div>
         </div>
+
+        {/* Botón para crear nueva empresa validada */}
+        <div className="flex justify-end mb-4">
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700"
+            onClick={() => setShowNewEmpresaForm(true)}
+          >
+            + Nueva Empresa Validada
+          </button>
+        </div>
+
+        {/* Modal de nueva empresa */}
+        {showNewEmpresaForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-lg w-full max-h-screen overflow-y-auto p-6">
+              <h2 className="text-xl font-bold mb-4">Registrar Nueva Empresa Validada</h2>
+              <form onSubmit={handleSubmitNuevaEmpresa} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nombre *</label>
+                  <input type="text" name="nombre" value={newEmpresa.nombre} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">RUT *</label>
+                  <input type="text" name="rut" value={newEmpresa.rut} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Dirección *</label>
+                  <input type="text" name="direccion" value={newEmpresa.direccion} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Ciudad *</label>
+                    <input type="text" name="ciudad" value={newEmpresa.ciudad} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Región *</label>
+                    <input type="text" name="region" value={newEmpresa.region} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Representante *</label>
+                  <input type="text" name="representante" value={newEmpresa.representante} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" required />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" name="email" value={newEmpresa.email} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Teléfono</label>
+                    <input type="text" name="telefono" value={newEmpresa.telefono} onChange={handleNewEmpresaChange} className="w-full border rounded px-3 py-2" />
+                  </div>
+                </div>
+                {errorNuevaEmpresa && <div className="text-red-600 text-sm">{errorNuevaEmpresa}</div>}
+                <div className="flex justify-end space-x-2 pt-2">
+                  <button type="button" onClick={() => setShowNewEmpresaForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+                  <button type="submit" disabled={isSubmittingEmpresa} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Registrar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Gestión de Notificaciones */}
         <NotificationManager />

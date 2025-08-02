@@ -20,6 +20,20 @@ export default function GestionAgentes() {
     enviar_email: false,
     activo: true
   });
+
+  // Listado de zonas
+  const zonas = [
+    'AV10_JULIO_NORTE',
+    'AV10_JULIO_SUR',
+    'AV10_JULIO_CENTRO',
+    'MATTA_ORIENTE',
+    'MATTA_PONIENTE',
+    'SANTA_ISABEL_NORTE',
+    'SANTA_ISABEL_SUR',
+    'VICUNA_MACKENNA_NORTE',
+    'VICUNA_MACKENNA_SUR',
+    'AUTOPISTA_CENTRAL'
+  ];
   const [procesando, setProcesando] = useState(false);
   const [mostrandoModalClave, setMostrandoModalClave] = useState(false);
   const [agenteParaClave, setAgenteParaClave] = useState(null);
@@ -668,23 +682,27 @@ export default function GestionAgentes() {
                   Teléfono
                 </label>
                 <input
-                  type="tel"
+                  type="text"
                   value={formData.telefono}
                   onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ej: +56912345678"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Zona asignada
                 </label>
-                <input
-                  type="text"
+                <select
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"
                   value={formData.zona_asignada}
                   onChange={(e) => setFormData(prev => ({ ...prev, zona_asignada: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ej: Santiago Centro, Las Condes, etc."
-                />
+                >
+                  <option value="">Selecciona una zona</option>
+                  {zonas.map(zona => (
+                    <option key={zona} value={zona}>{zona.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center">
                 <input

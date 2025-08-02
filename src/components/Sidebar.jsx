@@ -49,11 +49,27 @@ const linksProveedor = [
   { to: "/proveedor/solicitar-producto", label: "Solicitar Producto", icon: "📦" }
 ];
 
+const linksAgente = [
+  { to: "/dashboard/agente", label: "Mi Dashboard", icon: "🗂" },
+  { to: "/agente/empresas-asignadas", label: "Empresas Asignadas", icon: "🏢" },
+  { to: "/agente/nueva-empresa", label: "Registrar Empresa Validada", icon: "✅" }
+];
+
 export default function Sidebar({ rol }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const links = rol === "admin" ? linksAdmin : linksProveedor;
+  // Selección de menú según rol
+  let links;
+  if (rol === "admin") {
+    links = linksAdmin;
+  } else if (rol === "proveedor") {
+    links = linksProveedor;
+  } else if (rol === "agente") {
+    links = linksAgente;
+  } else {
+    links = linksProveedor;
+  }
   
   // Determinar si estamos en el contexto de admin
   const isInAdminContext = location.pathname.startsWith('/admin');
@@ -114,7 +130,7 @@ export default function Sidebar({ rol }) {
           {isCollapsed ? "☰" : "◀"}
         </button>
       </div>
-      
+
       <nav className="mt-4">
         {rol === "admin" ? (
           Object.entries(groupLinksBySection(linksAdmin)).map(([section, sectionLinks]) => (
@@ -124,21 +140,15 @@ export default function Sidebar({ rol }) {
                   {sectionTitles[section]}
                 </div>
               )}
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 mt-4">
                 {sectionLinks.map(link => {
-                  const currentPath = isInAdminContext 
-                    ? (link.to === "" ? "/admin" : `/admin/${link.to}`)
-                    : link.to;
-                  const isActive = location.pathname === currentPath;
-                  
+                  const isActive = location.pathname === (isInAdminContext ? `/admin/${link.to}` : link.to);
                   return (
                     <button
                       key={link.to}
                       onClick={() => handleNavigation(link.to)}
-                      className={`w-full px-4 py-2 mx-2 hover:bg-blue-800 rounded-lg transition-all text-sm flex items-center gap-3 ${
-                        isActive
-                          ? "bg-blue-800 font-semibold border-l-4 border-blue-300" 
-                          : "hover:border-l-4 hover:border-blue-400"
+                      className={`w-full px-4 py-2 mx-2 hover:bg-blue-800 rounded-lg transition-all flex items-center gap-3 ${
+                        isActive ? "bg-blue-800 font-semibold border-l-4 border-blue-300" : "hover:border-l-4 hover:border-blue-400"
                       } ${isCollapsed ? 'justify-center px-2' : ''}`}
                       title={isCollapsed ? link.label : ''}
                     >
@@ -154,13 +164,12 @@ export default function Sidebar({ rol }) {
           <div className="flex flex-col gap-1 mt-4">
             {links.map(link => {
               const isActive = location.pathname === link.to;
-              
               return (
                 <button
                   key={link.to}
                   onClick={() => navigate(link.to)}
                   className={`w-full px-4 py-2 mx-2 hover:bg-blue-800 rounded-lg transition-all flex items-center gap-3 ${
-                    isActive ? "bg-blue-800 font-semibold" : ""
+                    isActive ? "bg-blue-800 font-semibold border-l-4 border-blue-300" : "hover:border-l-4 hover:border-blue-400"
                   } ${isCollapsed ? 'justify-center px-2' : ''}`}
                   title={isCollapsed ? link.label : ''}
                 >

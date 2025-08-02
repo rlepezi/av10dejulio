@@ -10,6 +10,7 @@ export default function HeaderMenu() {
   const location = useLocation();
   const { user, rol, loading } = useAuth();
   const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const [showAgenteMenu, setShowAgenteMenu] = useState(false);
   const [showServiciosMenu, setShowServiciosMenu] = useState(false);
 
   const handleLogout = async () => {
@@ -21,6 +22,7 @@ export default function HeaderMenu() {
   const closeAllMenus = () => {
     setShowServiciosMenu(false);
     setShowAdminMenu(false);
+    setShowAgenteMenu(false);
   };
 
   // Para subrayar el link activo
@@ -57,7 +59,52 @@ export default function HeaderMenu() {
         </button>
         
         {/* Dashboard por rol */}
-        {user && rol !== "admin" && (
+        {user && rol === "agente" && (
+          <div className="relative">
+            <button
+              className="hover:underline flex items-center gap-1"
+              onClick={() => setShowAgenteMenu(!showAgenteMenu)}
+            >
+              📊 Mi Dashboard
+              <span className="text-xs">▼</span>
+            </button>
+            {showAgenteMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-2 min-w-48 z-50">
+                <button
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm font-semibold border-b border-gray-200"
+                  onClick={() => {
+                    navigate("/dashboard/agente");
+                    setShowAgenteMenu(false);
+                  }}
+                >
+                  🗂 Mi Dashboard
+                </button>
+                <div className="border-b border-gray-200 pb-2 mb-2">
+                  <div className="px-4 py-1 text-xs text-gray-500 font-semibold">EMPRESAS</div>
+                  <button
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm"
+                    onClick={() => {
+                      navigate("/agente/empresas-asignadas");
+                      setShowAgenteMenu(false);
+                    }}
+                  >
+                    🏢 Empresas Asignadas
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm"
+                    onClick={() => {
+                      navigate("/agente/nueva-empresa");
+                      setShowAgenteMenu(false);
+                    }}
+                  >
+                    ✅ Registrar Empresa Validada
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {user && rol !== "admin" && rol !== "agente" && (
           <button
             className={activeClass(
               rol === "proveedor" ? "/dashboard/proveedor" :
@@ -66,7 +113,6 @@ export default function HeaderMenu() {
             )}
             onClick={() => {
               closeAllMenus();
-              
               if (rol === "proveedor") navigate("/dashboard/proveedor");
               else if (rol === "mecanico") navigate("/dashboard/mecanico");
               else navigate("/dashboard/cliente");

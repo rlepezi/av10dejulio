@@ -76,11 +76,11 @@ const AgentesCampo = () => {
 
   const asignarEmpresasAutomaticamente = async (agenteId, zona) => {
     try {
-      // Buscar empresas sin agente en la zona
+      // Buscar empresas sin agente en la zona seleccionada
       const empresasSinAgente = await getDocs(query(
         collection(db, 'empresas'),
         where('agenteAsignado', '==', null),
-        where('zona', '==', 'AV10_JULIO'), // Todas están en AV10_JULIO por el catastro
+        where('zona', '==', zona),
         where('estado', 'in', ['Enviada', 'En Revisión'])
       ));
 
@@ -90,7 +90,7 @@ const AgentesCampo = () => {
       }
 
       const batch = writeBatch(db);
-      
+
       empresasSinAgente.docs.forEach(empresaDoc => {
         batch.update(empresaDoc.ref, {
           agenteAsignado: agenteId,
@@ -99,13 +99,13 @@ const AgentesCampo = () => {
       });
 
       await batch.commit();
-      
+
       // Actualizar contador del agente
       await updateDoc(doc(db, 'agentes', agenteId), {
         empresasAsignadas: empresasSinAgente.docs.length
       });
 
-      alert(`${empresasSinAgente.docs.length} empresas asignadas al agente`);
+      alert(`${empresasSinAgente.docs.length} empresas asignadas al agente en zona ${zona.replace(/_/g, ' ')}`);
     } catch (error) {
       console.error('Error asignando empresas:', error);
       alert('Error al asignar empresas');
