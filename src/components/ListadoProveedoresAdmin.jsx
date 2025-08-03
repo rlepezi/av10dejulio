@@ -50,9 +50,12 @@ export default function ListadoProveedoresAdmin() {
 
   useEffect(() => {
     console.log('🔍 ListadoProveedoresAdmin: Iniciando carga de datos...');
-    
-    // Cargar empresas/proveedores activos
-    const qEmpresas = query(collection(db, "empresas"), orderBy("fecha_registro", "desc"));
+    // Cargar empresas con estado 'activa' o 'validada'
+    const qEmpresas = query(
+      collection(db, "empresas"),
+      where('estado', 'in', ['activa', 'validada']),
+      orderBy("fecha_registro", "desc")
+    );
     const unsubEmpresas = onSnapshot(qEmpresas, snap => {
       const empresasData = snap.docs.map(doc => ({ 
         id: doc.id, 
@@ -64,7 +67,10 @@ export default function ListadoProveedoresAdmin() {
     }, error => {
       console.error('❌ Error cargando empresas:', error);
       // Intentar consulta sin orderBy si falla
-      const qEmpresasSimple = collection(db, "empresas");
+      const qEmpresasSimple = query(
+        collection(db, "empresas"),
+        where('estado', 'in', ['activa', 'validada'])
+      );
       const unsubEmpresasSimple = onSnapshot(qEmpresasSimple, snap => {
         const empresasData = snap.docs.map(doc => ({ 
           id: doc.id, 
@@ -114,9 +120,12 @@ export default function ListadoProveedoresAdmin() {
     let items = [];
     
     if (filtros.mostrar === 'todos' || filtros.mostrar === 'empresas') {
-      // Solo empresas activas y normalizar tipoEmpresa
-      const empresasActivas = proveedores.filter(p => (p.estado || '').toLowerCase() === 'activa');
-      items = [...items, ...empresasActivas];
+      // Solo empresas activas o validadas y normalizar tipoEmpresa
+      const empresasVisibles = proveedores.filter(p => {
+        const estado = (p.estado || '').toLowerCase();
+        return estado === 'activa' || estado === 'validada';
+      });
+      items = [...items, ...empresasVisibles];
     }
     
     if (filtros.mostrar === 'todos' || filtros.mostrar === 'solicitudes') {
@@ -231,7 +240,10 @@ export default function ListadoProveedoresAdmin() {
             </div>
             <div className="ml-3">
               <p className="text-xl font-bold text-green-600">
-                {proveedores.filter(p => p.estado === 'activa').length}
+                {proveedores.filter(p => {
+                  const estado = (p.estado || '').toLowerCase();
+                  return estado === 'activa' || estado === 'validada';
+                }).length}
               </p>
               <p className="text-green-600 text-sm">Activas</p>
             </div>

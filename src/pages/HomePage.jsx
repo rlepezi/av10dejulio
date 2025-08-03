@@ -29,15 +29,15 @@ const HomePage = () => {
         
         // Intento 1: Empresas con estado 'activa' (minúscula, como se crea en SolicitudesRegistro)
         try {
-          console.log('🔄 Buscando empresas con estado "activa"...');
+          console.log('🔄 Buscando empresas con estado "activa" o "validada"...');
           const q1 = query(
             collection(db, 'empresas'),
-            where('estado', '==', 'activa'),
+            where('estado', 'in', ['activa', 'validada']),
             limit(8)
           );
           
           const snapshot1 = await getDocs(q1);
-          console.log('📊 Empresas con estado "activa":', snapshot1.size);
+          console.log('📊 Empresas con estado "activa" o "validada":', snapshot1.size);
           
           if (snapshot1.size > 0) {
             empresasEncontradas = snapshot1.docs.map(doc => ({
@@ -100,11 +100,10 @@ const HomePage = () => {
             // Tomar solo las que tienen estado activo (cualquier formato)
             empresasEncontradas = snapshot3.docs
               .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter(empresa => 
-                empresa.estado === 'activa' || 
-                empresa.estado === 'Activa' ||
-                empresa.estado === 'ACTIVA'
-              )
+              .filter(empresa => {
+                const estado = (empresa.estado || '').toLowerCase();
+                return estado === 'activa' || estado === 'validada';
+              })
               .slice(0, 8);
             
             console.log('✅ Empresas activas filtradas:', empresasEncontradas.length);

@@ -25,7 +25,10 @@ export default function ListadoEmpresas({
   }, []);
 
   // Solo mostrar empresas con estado 'Activa'
-  let empresasFiltradas = empresas.filter(emp => emp.estado === "Activa");
+  let empresasFiltradas = empresas.filter(emp => {
+    const estado = (emp.estado || '').toLowerCase();
+    return estado === 'activa' || estado === 'validada';
+  });
 
   if (filtroMarca) {
     empresasFiltradas = empresasFiltradas.filter(emp =>

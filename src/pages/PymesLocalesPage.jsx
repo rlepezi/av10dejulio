@@ -102,7 +102,7 @@ const PymesLocalesPage = () => {
     try {
       const q = query(
         collection(db, 'empresas'),
-        where('estado', '==', 'activa'),
+        where('estado', 'in', ['activa', 'validada']),
         orderBy('nombre')
       );
       

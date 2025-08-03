@@ -16,7 +16,7 @@ export default function ListadoEmpresasUnificado({
 
   // Solo muestra empresas activas y mapea todos los campos reales
   useEffect(() => {
-    const q = query(collection(db, "empresas"), where("estado", "==", "Activa"));
+    const q = query(collection(db, "empresas"), where("estado", "in", ["activa", "validada"]));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const empresasData = snapshot.docs.map(doc => {
         const data = doc.data();

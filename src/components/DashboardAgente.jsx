@@ -17,6 +17,32 @@ import NotificationManager from './NotificationManager';
 import pushNotificationService from '../services/PushNotificationService';
 
 export default function DashboardAgente() {
+  // ...existing code...
+  const getEstadoPrioridad = (empresa) => {
+    const diasAsignacion = empresa.fecha_asignacion_agente 
+      ? Math.floor((new Date() - empresa.fecha_asignacion_agente.toDate()) / (1000 * 60 * 60 * 24))
+      : 0;
+    if (diasAsignacion > 7) return 'URGENTE';
+    if (diasAsignacion > 3) return 'ALTA';
+    return 'NORMAL';
+  };
+  // ...existing code...
+  const getEstadoColor = (estado) => {
+    switch (estado?.toLowerCase()) {
+      case 'activa':
+        return 'bg-green-100 text-green-800';
+      case 'validada':
+        return 'bg-blue-100 text-blue-800';
+      case 'pendiente':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'inactiva':
+        return 'bg-red-100 text-red-800';
+      case 'en_revision':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
   const { user, rol } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -179,8 +205,19 @@ export default function DashboardAgente() {
     if (!selectedEmpresa) return;
     
     try {
+      // Si el agente aprueba y activa la empresa, el estado debe ser 'validada'
+      let nuevoEstado = visitaForm.estado_validacion;
+      if (
+        visitaForm.estado_validacion === 'activa' &&
+        visitaForm.ubicacion_verificada &&
+        visitaForm.documentos_validados &&
+        visitaForm.establecimiento_operativo
+      ) {
+        nuevoEstado = 'validada';
+      }
+
       const updateData = {
-        estado: visitaForm.estado_validacion,
+        estado: nuevoEstado,
         validacion_agente: {
           agente_id: agente.id,
           agente_nombre: agente.nombre,
@@ -194,11 +231,8 @@ export default function DashboardAgente() {
         fecha_ultima_validacion: serverTimestamp()
       };
 
-      // Si se activa la empresa y se marca como validada completamente, agregar a la comunidad
-      if (visitaForm.estado_validacion === 'activa' && 
-          visitaForm.ubicacion_verificada && 
-          visitaForm.documentos_validados && 
-          visitaForm.establecimiento_operativo) {
+      // Si se marca como validada, agregar a la comunidad
+      if (nuevoEstado === 'validada') {
         updateData.es_comunidad = true;
         updateData.tipo_empresa = 'comunidad';
         updateData.fecha_ingreso_comunidad = serverTimestamp();
@@ -216,7 +250,7 @@ export default function DashboardAgente() {
         empresa_id: selectedEmpresa.id,
         empresa_nombre: selectedEmpresa.nombre,
         fecha_visita: serverTimestamp(),
-        resultado: visitaForm.estado_validacion,
+        resultado: nuevoEstado,
         observaciones: visitaForm.observaciones,
         checklist: {
           ubicacion_verificada: visitaForm.ubicacion_verificada,
@@ -228,8 +262,8 @@ export default function DashboardAgente() {
 
       // Actualizar estadísticas del agente
       const nuevoContador = (agente.visitasRealizadas || 0) + 1;
-      const empresasActivadas = visitaForm.estado_validacion === 'activa' 
-        ? (agente.empresasActivadas || 0) + 1 
+      const empresasActivadas = nuevoEstado === 'validada'
+        ? (agente.empresasActivadas || 0) + 1
         : (agente.empresasActivadas || 0);
 
       await updateDoc(doc(db, 'agentes', agente.id), {
@@ -241,50 +275,13 @@ export default function DashboardAgente() {
       alert('Validación guardada exitosamente');
       setShowValidationForm(false);
       setSelectedEmpresa(null);
-      
       // Recargar datos
       loadAgenteData();
-      
     } catch (error) {
       console.error('Error submitting validation:', error);
       alert('Error al guardar la validación');
     }
-  };
-
-  const getEstadoColor = (estado) => {
-    switch (estado?.toLowerCase()) {
-      case 'activa':
-        return 'bg-green-100 text-green-800';
-      case 'pendiente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'inactiva':
-        return 'bg-red-100 text-red-800';
-      case 'en_revision':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getEstadoPrioridad = (empresa) => {
-    const diasAsignacion = empresa.fecha_asignacion_agente 
-      ? Math.floor((new Date() - empresa.fecha_asignacion_agente.toDate()) / (1000 * 60 * 60 * 24))
-      : 0;
-    
-    if (diasAsignacion > 7) return 'URGENTE';
-    if (diasAsignacion > 3) return 'ALTA';
-    return 'NORMAL';
-  };
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+    // ...existing code...
 
   if (rol !== 'agente') {
     return (
@@ -296,10 +293,16 @@ export default function DashboardAgente() {
       </DashboardLayout>
     );
   }
+}
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Mensaje de depuración para confirmar el dashboard avanzado */}
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+          <strong>DEBUG:</strong> Estás viendo el <b>Dashboard avanzado del agente</b> desde <code>src/components/DashboardAgente.jsx</code>.
+          <br />Usuario: {user?.email || 'No autenticado'} | Rol: {rol}
+        </div>
         {/* Header del Agente */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between">
