@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useFirestoreCollection } from '../hooks/useFirestore';
-import { collection, addDoc, updateDoc, doc, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, writeBatch, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 
@@ -16,15 +16,32 @@ const AgentesCampo = () => {
     activo: true
   });
 
-  // Obtener agentes
-  const { data: agentes, loading: loadingAgentes } = useFirestoreCollection('agentes', {
-    orderBy: ['fechaCreacion', 'desc']
-  });
+  // Obtener agentes (igual que GestionAgentes)
+  const [agentes, setAgentes] = useState([]);
+  const [loadingAgentes, setLoadingAgentes] = useState(true);
+  React.useEffect(() => {
+    const cargarAgentes = async () => {
+      setLoadingAgentes(true);
+      try {
+        const q = query(collection(db, 'agentes'), orderBy('nombre'));
+        const snapshot = await getDocs(q);
+        const agentesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAgentes(agentesData);
+      } catch (error) {
+        console.error('Error cargando agentes:', error);
+      } finally {
+        setLoadingAgentes(false);
+      }
+    };
+    cargarAgentes();
+  }, []);
 
   // Obtener empresas asignadas a agentes
-  const { data: empresasAsignadas } = useFirestoreCollection('empresas', {
+  // Solo empresas asignadas y en estado 'Activa' o 'Validada'
+  const { data: empresasAsignadasRaw } = useFirestoreCollection('empresas', {
     where: ['agenteAsignado', '!=', null]
   });
+  const empresasAsignadas = empresasAsignadasRaw?.filter(e => e.estado && (e.estado.toLowerCase() === 'activa' || e.estado.toLowerCase() === 'validada')) || [];
 
   const zonas = [
     'AV10_JULIO_NORTE',
@@ -113,9 +130,11 @@ const AgentesCampo = () => {
   };
 
   const AgenteCard = ({ agente }) => {
-    const empresasDelAgente = empresasAsignadas?.filter(e => e.agenteAsignado === agente.id) || [];
+    // Solo empresas en estado 'Activa' o 'Validada'
+    const empresasDelAgente = empresasAsignadas?.filter(e => e.agenteAsignado === agente.id && (e.estado?.toLowerCase() === 'activa' || e.estado?.toLowerCase() === 'validada')) || [];
     const visitasRealizadas = empresasDelAgente.filter(e => e.visitaAgente).length;
-    const empresasActivadas = empresasDelAgente.filter(e => e.estado === 'Activa').length;
+    const empresasActivadas = empresasDelAgente.filter(e => e.estado?.toLowerCase() === 'activa').length;
+    const empresasValidadas = empresasDelAgente.filter(e => e.estado?.toLowerCase() === 'validada').length;
 
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -146,7 +165,7 @@ const AgentesCampo = () => {
             <div className="text-xl font-bold text-blue-600">
               {empresasDelAgente.length}
             </div>
-            <div className="text-xs text-gray-600">Asignadas</div>
+            <div className="text-xs text-gray-600">Asignadas (Activas/Validadas)</div>
           </div>
           <div className="text-center">
             <div className="text-xl font-bold text-green-600">
@@ -159,6 +178,12 @@ const AgentesCampo = () => {
               {empresasActivadas}
             </div>
             <div className="text-xs text-gray-600">Activadas</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-teal-600">
+              {empresasValidadas}
+            </div>
+            <div className="text-xs text-gray-600">Validadas</div>
           </div>
         </div>
 
@@ -234,7 +259,7 @@ const AgentesCampo = () => {
 
         {/* Estadísticas generales */}
         <div className="p-6 border-b bg-gray-50">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="bg-white p-4 rounded-lg text-center">
               <div className="text-2xl font-bold text-blue-600">
                 {agentes?.length || 0}
@@ -249,15 +274,27 @@ const AgentesCampo = () => {
             </div>
             <div className="bg-white p-4 rounded-lg text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {empresasAsignadas?.length || 0}
+                {empresasAsignadas?.filter(e => e.estado && (e.estado.toLowerCase() === 'activa' || e.estado.toLowerCase() === 'validada')).length || 0}
               </div>
-              <div className="text-sm text-gray-600">Empresas Asignadas</div>
+              <div className="text-sm text-gray-600">Empresas Asignadas (Activas/Validadas)</div>
             </div>
             <div className="bg-white p-4 rounded-lg text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {empresasAsignadas?.filter(e => e.visitaAgente).length || 0}
+                {empresasAsignadas?.filter(e => e.visitaAgente === true && (e.estado && (e.estado.toLowerCase() === 'activa' || e.estado.toLowerCase() === 'validada'))).length || 0}
               </div>
-              <div className="text-sm text-gray-600">Visitas Realizadas</div>
+              <div className="text-sm text-gray-600">Empresas Visitadas</div>
+            </div>
+            <div className="bg-white p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-teal-600">
+                {empresasAsignadas?.filter(e => e.estado && e.estado.toLowerCase() === 'activa').length || 0}
+              </div>
+              <div className="text-sm text-gray-600">Empresas Activas</div>
+            </div>
+            <div className="bg-white p-4 rounded-lg text-center">
+              <div className="text-2xl font-bold text-indigo-600">
+                {empresasAsignadas?.filter(e => e.estado && e.estado.toLowerCase() === 'validada').length || 0}
+              </div>
+              <div className="text-sm text-gray-600">Empresas Validadas</div>
             </div>
           </div>
         </div>
@@ -390,7 +427,7 @@ const AgentesCampo = () => {
               {/* Lista de empresas asignadas */}
               <div className="space-y-3">
                 {empresasAsignadas
-                  ?.filter(e => e.agenteAsignado === agenteSeleccionado.id)
+                  .filter(e => e.agenteAsignado === agenteSeleccionado.id)
                   .map(empresa => (
                     <div key={empresa.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex justify-between items-start">
@@ -407,8 +444,8 @@ const AgentesCampo = () => {
                             {empresa.visitaAgente ? '✅ Visitada' : '⏰ Pendiente'}
                           </span>
                           <span className={`px-2 py-1 rounded text-xs ${
-                            empresa.estado === 'Activa' ? 'bg-green-100 text-green-800' :
-                            empresa.estado === 'En Revisión' ? 'bg-blue-100 text-blue-800' :
+                            empresa.estado?.toLowerCase() === 'activa' ? 'bg-green-100 text-green-800' :
+                            empresa.estado?.toLowerCase() === 'validada' ? 'bg-indigo-100 text-indigo-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
                             {empresa.estado}
