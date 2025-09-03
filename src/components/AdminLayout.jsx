@@ -19,7 +19,6 @@ import AdminValidacionClientes from "./AdminValidacionClientes";
 import AdminDashboardStats from "./AdminDashboardStats";
 import CatastroMasivo from "./CatastroMasivo";
 import PanelValidacionAvanzado from "./PanelValidacionAvanzado";
-import AgentesCampo from "./AgentesCampo";
 import GestionAgentes from "./GestionAgentes";
 import AdminSetup from "./AdminSetup";
 import ReviewModerationPage from "../pages/ReviewModerationPage";
@@ -27,6 +26,7 @@ import TicketManagementPage from "../pages/TicketManagementPage";
 import ResourceManager from "./ResourceManager";
 import EditarEmpresaAdmin from "./EditarEmpresaAdmin";
 import ListadoProveedoresAdmin from "./ListadoProveedoresAdmin";
+import CrearEmpresaPublicaPage from "./CrearEmpresaPublicaPage";
 
 // Servicios
 import ServicioSeguros from "./ServicioSeguros";
@@ -51,6 +51,7 @@ export default function AdminLayout() {
         
         {/* Administración */}
         <Route path="empresas" element={<GestionEmpresas />} />
+        <Route path="crear-empresa-publica" element={<CrearEmpresaPublicaPage />} />
         <Route path="editar-empresa/:empresaId" element={<EditarEmpresaAdmin />} />
         <Route path="editar-solicitud" element={<EditarSolicitud />} />
         <Route path="solicitudes-registro" element={<SolicitudesRegistro />} />
@@ -70,7 +71,7 @@ export default function AdminLayout() {
         {/* Catastro */}
         <Route path="catastro-masivo" element={<CatastroMasivo />} />
         <Route path="panel-validacion" element={<PanelValidacionAvanzado />} />
-        <Route path="agentes-campo" element={<AgentesCampo />} />
+        <Route path="agentes-campo" element={<GestionAgentes />} />
         <Route path="gestion-agentes" element={<GestionAgentes />} />
         
         {/* Gestión de campañas y productos */}

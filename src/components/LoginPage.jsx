@@ -99,14 +99,17 @@ export default function LoginPage() {
         // Redirección automática según tipo y rol
         if (rol === "admin") {
           navigate("/admin");
+            } else if (rol === "proveedor" || tipoLogin === "proveedor" || tipoUsuario === "proveedor") {
+      navigate("/dashboard/proveedor");
         } else if (rol === "agente") {
           navigate("/agente");
-        } else if (rol === "proveedor" || tipoLogin === "proveedor" || tipoUsuario === "proveedor") {
-          navigate("/dashboard/proveedor");
-        } else if (rol === "cliente" || tipoLogin === "cliente" || tipoUsuario === "cliente") {
+        } else if (rol === "mecanico") {
+          navigate("/dashboard/mecanico");
+        } else if (rol === "cliente") {
           navigate("/dashboard/cliente");
         } else {
-          navigate("/");
+          // Usuario sin rol específico, redirigir al dashboard general
+          navigate("/dashboard/cliente");
         }
       } else {
         // Si no existe en usuarios, verificar si es agente pendiente

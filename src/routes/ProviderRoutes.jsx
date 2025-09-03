@@ -2,35 +2,35 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 
-// Componentes de proveedor/empresa
+// Componentes de empresa
 import PostularEmpresaPage from '../components/PostularEmpresaPage';
-import RegistroProveedor from '../components/RegistroProveedor';
-import DashboardProveedorMejorado from '../components/DashboardProveedorMejorado';
+import RegistroEmpresa from '../components/RegistroEmpresa';
+import DashboardEmpresa from '../components/DashboardEmpresa';
 import MiEmpresaPage from '../components/MiEmpresaPage';
 import SolicitudCampanaPage from '../components/SolicitudCampanaPage';
 import SolicitudProductoPage from '../components/SolicitudProductoPage';
 import EditarCampanaPage from '../components/EditarCampanaPage';
 import EditarProductoPage from '../components/EditarProductoPage';
 
-const ProviderRoutes = () => {
+const EmpresaRoutes = () => {
   return (
     <Routes>
       {/* Rutas públicas de registro */}
       <Route path="/registrar-empresa" element={<PostularEmpresaPage />} />
-      <Route path="/registro-proveedor" element={<RegistroProveedor />} />
+      <Route path="/registro-empresa" element={<RegistroEmpresa />} />
       
-      {/* Rutas protegidas de proveedor */}
+      {/* Rutas protegidas de empresa */}
       <Route
-        path="/proveedor"
+        path="/empresa"
         element={
           <ProtectedRoute>
-            <DashboardProveedorMejorado />
+            <DashboardEmpresa />
           </ProtectedRoute>
         }
       />
       
       <Route
-        path="/proveedor/mi-empresa"
+        path="/empresa/mi-empresa"
         element={
           <ProtectedRoute>
             <MiEmpresaPage />
@@ -39,7 +39,7 @@ const ProviderRoutes = () => {
       />
       
       <Route
-        path="/proveedor/solicitar-campana"
+        path="/empresa/solicitar-campana"
         element={
           <ProtectedRoute>
             <SolicitudCampanaPage />
@@ -48,7 +48,7 @@ const ProviderRoutes = () => {
       />
       
       <Route
-        path="/proveedor/solicitar-producto"
+        path="/empresa/solicitar-producto"
         element={
           <ProtectedRoute>
             <SolicitudProductoPage />
@@ -57,7 +57,7 @@ const ProviderRoutes = () => {
       />
       
       <Route
-        path="/proveedor/editar-campana/:id"
+        path="/empresa/editar-campana/:id"
         element={
           <ProtectedRoute>
             <EditarCampanaPage />
@@ -66,7 +66,7 @@ const ProviderRoutes = () => {
       />
       
       <Route
-        path="/proveedor/editar-producto/:id"
+        path="/empresa/editar-producto/:id"
         element={
           <ProtectedRoute>
             <EditarProductoPage />
@@ -77,4 +77,4 @@ const ProviderRoutes = () => {
   );
 };
 
-export default ProviderRoutes;
+export default EmpresaRoutes;

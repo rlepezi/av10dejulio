@@ -3,6 +3,7 @@ import { collection, getDocs, doc, updateDoc, query, orderBy, where, addDoc } fr
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { NotificationService } from '../utils/notificationService';
+import { ESTADOS_EMPRESA, ESTADOS_SOLICITUD, obtenerDescripcionEstado, puedeTransicionar } from '../utils/empresaStandards';
 
 export default function AdminSolicitudesEmpresa() {
   const { user } = useAuth();
@@ -105,6 +106,12 @@ export default function AdminSolicitudesEmpresa() {
 
   const actualizarEstado = async (item, nuevoEstado) => {
     try {
+      // Validar transición permitida
+      if (!puedeTransicionar(item.estado, nuevoEstado, item.coleccion !== 'empresas')) {
+        NotificationService.showError(`No se puede cambiar de "${item.estado}" a "${nuevoEstado}"`);
+        return;
+      }
+
       if (item.coleccion === 'empresas') {
         // Para empresas registradas, actualizar el estado en la colección empresas
         await updateDoc(doc(db, 'empresas', item.id), {
@@ -119,13 +126,13 @@ export default function AdminSolicitudesEmpresa() {
         });
 
         // Si se aprueba una solicitud, crear registro en empresas
-        if (nuevoEstado === 'aprobada') {
+        if (nuevoEstado === ESTADOS_SOLICITUD.APROBADA) {
           await crearEmpresaDesdeolicitud(item);
         }
       }
       
       await cargarSolicitudes();
-      NotificationService.showSuccess(`Estado actualizado a ${nuevoEstado}`);
+      NotificationService.showSuccess(`Estado actualizado a ${obtenerDescripcionEstado(nuevoEstado, item.coleccion !== 'empresas')}`);
     } catch (error) {
       console.error('Error al actualizar estado:', error);
       NotificationService.showError('Error al actualizar el estado');
@@ -151,7 +158,7 @@ export default function AdminSolicitudesEmpresa() {
           email: solicitud.emailRepresentante,
           telefono: solicitud.telefonoRepresentante
         },
-        estado: 'activa',
+        estado: ESTADOS_EMPRESA.ACTIVA,
         fechaRegistro: new Date(),
         fechaAprobacion: new Date(),
         solicitudOriginalId: solicitud.id,
@@ -174,10 +181,22 @@ export default function AdminSolicitudesEmpresa() {
 
   const obtenerEstadoColor = (estado) => {
     switch (estado) {
-      case 'pendiente': return 'bg-yellow-100 text-yellow-800';
-      case 'en_revision': return 'bg-blue-100 text-blue-800';
-      case 'aprobada': return 'bg-green-100 text-green-800';
-      case 'rechazada': return 'bg-red-100 text-red-800';
+      // Estados de solicitud
+      case ESTADOS_SOLICITUD.PENDIENTE: return 'bg-yellow-100 text-yellow-800';
+      case ESTADOS_SOLICITUD.EN_REVISION: return 'bg-blue-100 text-blue-800';
+      case ESTADOS_SOLICITUD.APROBADA: return 'bg-green-100 text-green-800';
+      case ESTADOS_SOLICITUD.RECHAZADA: return 'bg-red-100 text-red-800';
+      
+      // Estados de empresa
+      case ESTADOS_EMPRESA.CATALOGADA: return 'bg-gray-100 text-gray-800';
+      case ESTADOS_EMPRESA.PENDIENTE_VALIDACION: return 'bg-yellow-100 text-yellow-800';
+      case ESTADOS_EMPRESA.EN_VISITA: return 'bg-orange-100 text-orange-800';
+      case ESTADOS_EMPRESA.VALIDADA: return 'bg-blue-100 text-blue-800';
+      case ESTADOS_EMPRESA.ACTIVA: return 'bg-green-100 text-green-800';
+      case ESTADOS_EMPRESA.SUSPENDIDA: return 'bg-red-100 text-red-800';
+      case ESTADOS_EMPRESA.INACTIVA: return 'bg-gray-100 text-gray-800';
+      case ESTADOS_EMPRESA.RECHAZADA: return 'bg-red-100 text-red-800';
+      
       default: return 'bg-gray-100 text-gray-800';
     }
   };

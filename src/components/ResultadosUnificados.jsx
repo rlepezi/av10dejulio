@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useImageUrl } from '../hooks/useImageUrl';
 import { 
   OfficeBuildingIcon as BuildingOfficeIcon, 
   ShoppingBagIcon, 
@@ -11,6 +12,39 @@ import {
   ClockIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/outline';
+
+// Componente para mostrar imagen con manejo de URLs de Firebase Storage
+function CompanyImage({ imagen, nombre }) {
+  const { imageUrl, loading, error } = useImageUrl(imagen);
+
+  if (!imagen) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg flex items-center justify-center">
+        <span className="text-2xl">🏪</span>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+        <div className="w-4 h-4 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="w-full h-full bg-red-100 rounded-lg flex items-center justify-center">
+        <span className="text-xs text-red-500">Error</span>
+      </div>
+    );
+  }
+
+  return (
+    <img src={imageUrl} alt={nombre} className="w-full h-full object-cover rounded-lg" />
+  );
+}
 
 export default function ResultadosUnificados({ resultados, loading }) {
   const navigate = useNavigate();
@@ -78,13 +112,7 @@ export default function ResultadosUnificados({ resultados, loading }) {
         <div className="flex gap-4">
           {/* Imagen o placeholder */}
           <div className="w-16 h-16 flex-shrink-0">
-            {empresa.imagen ? (
-              <img src={empresa.imagen} alt={empresa.nombre_empresa} className="w-full h-full object-cover rounded-lg" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🏪</span>
-              </div>
-            )}
+            <CompanyImage imagen={empresa.imagen} nombre={empresa.nombre_empresa} />
           </div>
 
           {/* Información */}
@@ -232,7 +260,7 @@ export default function ResultadosUnificados({ resultados, loading }) {
                 ? 'bg-green-100 text-green-800'
                 : 'bg-gray-100 text-gray-800'
             }`}>
-              {campaña.activa ? 'Activa' : 'Finalizada'}
+              {campaña.activa ? 'activa' : 'Finalizada'}
             </span>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, updateDoc, doc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, addDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -169,8 +169,8 @@ export default function RegistroAgente() {
           fecha_activacion: new Date()
         });
       } else {
-        // Crear nuevo registro de usuario
-        await addDoc(collection(db, 'usuarios'), {
+        // Crear nuevo registro de usuario usando setDoc con el UID correcto
+        await setDoc(doc(db, 'usuarios', nuevoUid), {
           uid: nuevoUid,
           email: agenteData.email,
           nombre: agenteData.nombre,

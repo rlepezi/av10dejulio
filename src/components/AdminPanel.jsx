@@ -5,9 +5,14 @@ import { db } from "../firebase";
 import AdminStoreList from "./AdminStoreList";
 import CampaignList from "./CampaignList";
 import CampaignForm from "./CampaignForm";
+import CrearEmpresaPublica from "./CrearEmpresaPublica";
+import QuickAccessPanel from "./QuickAccessPanel";
+import AdminSolicitudesProducto from "./AdminSolicitudesProducto";
+import AdminSolicitudesCampana from "./AdminSolicitudesCampana";
 
 function AdminPanel({ user }) {
   const [tab, setTab] = useState("overview");
+  const [mostrarCrearEmpresa, setMostrarCrearEmpresa] = useState(false);
   const [stats, setStats] = useState({
     totalEmpresas: 0,
     empresasActivas: 0,
@@ -46,20 +51,35 @@ function AdminPanel({ user }) {
         const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
         console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);
         
-        // Total de solicitudes pendientes
-        const totalSolicitudesPendientes = solicitudesEmpresaSnapshot.size + solicitudesProveedorSnapshot.size;
-        
-        // Solicitudes clientes pendientes
-        const clientesQuery = query(
-          collection(db, 'solicitudes_cliente'),
-          where('estado', '==', 'pendiente')
+        // Solicitudes de campañas
+        const solicitudesCampanaQuery = query(
+          collection(db, 'solicitudes_campana'),
+          where('estado', 'in', ['pendiente', 'en_revision'])
         );
-        const clientesSnapshot = await getDocs(clientesQuery);
-        console.log('👥 Solicitudes cliente pendientes:', clientesSnapshot.size);
-
+        const solicitudesCampanaSnapshot = await getDocs(solicitudesCampanaQuery);
+        console.log('📢 Solicitudes campaña pendientes:', solicitudesCampanaSnapshot.size);
+        
+        // Solicitudes de productos
+        const solicitudesProductoQuery = query(
+          collection(db, 'solicitudes_producto'),
+          where('estado', 'in', ['pendiente', 'en_revision'])
+        );
+        const solicitudesProductoSnapshot = await getDocs(solicitudesProductoQuery);
+        console.log('📦 Solicitudes producto pendientes:', solicitudesProductoSnapshot.size);
+        
+        // Clientes pendientes
+        const clientesSnapshot = await getDocs(collection(db, 'clientes'));
+        console.log('👥 Clientes totales:', clientesSnapshot.size);
+        
         // Campañas
         const campañasSnapshot = await getDocs(collection(db, 'campañas'));
         console.log('📢 Campañas totales:', campañasSnapshot.size);
+
+        const totalSolicitudesPendientes = 
+          solicitudesEmpresaSnapshot.size + 
+          solicitudesProveedorSnapshot.size + 
+          solicitudesCampanaSnapshot.size + 
+          solicitudesProductoSnapshot.size;
 
         const nuevasStats = {
           totalEmpresas: empresasSnapshot.size,
@@ -69,7 +89,7 @@ function AdminPanel({ user }) {
           totalCampañas: campañasSnapshot.size
         };
         
-        console.log('✅ Estadísticas actualizadas:', nuevasStats);
+        console.log('✅ Estadísticas recargadas:', nuevasStats);
         setStats(nuevasStats);
       } catch (error) {
         console.error('❌ Error cargando estadísticas:', error);
@@ -82,48 +102,56 @@ function AdminPanel({ user }) {
   }, []);
 
   const recargarEstadisticas = async () => {
-    setLoading(true);
-    console.log('🔄 Recargando estadísticas manualmente...');
-    
     try {
+      setLoading(true);
+      console.log('🔄 Recargando estadísticas...');
+      
       // Empresas
       const empresasSnapshot = await getDocs(collection(db, 'empresas'));
       const empresasActivas = empresasSnapshot.docs.filter(doc => {
         const estado = doc.data().estado;
         return estado === 'activa' || estado === 'Activa';
       });
-      console.log('🏢 Empresas encontradas:', empresasSnapshot.size, 'Activas:', empresasActivas.length);
       
-      // Solicitudes de empresas/proveedores pendientes (colección principal)
+      // Solicitudes de empresas/proveedores pendientes
       const solicitudesEmpresaQuery = query(
         collection(db, 'solicitudes_empresa'),
         where('estado', 'in', ['pendiente', 'en_revision'])
       );
       const solicitudesEmpresaSnapshot = await getDocs(solicitudesEmpresaQuery);
-      console.log('📋 Solicitudes empresa pendientes:', solicitudesEmpresaSnapshot.size);
       
-      // Solicitudes de proveedores (colección adicional)
+      // Solicitudes de proveedores
       const solicitudesProveedorQuery = query(
         collection(db, 'solicitudes_proveedor'),
         where('estado_general', 'in', ['enviada', 'en_revision'])
       );
       const solicitudesProveedorSnapshot = await getDocs(solicitudesProveedorQuery);
-      console.log('📋 Solicitudes proveedor pendientes:', solicitudesProveedorSnapshot.size);
       
-      // Total de solicitudes pendientes
-      const totalSolicitudesPendientes = solicitudesEmpresaSnapshot.size + solicitudesProveedorSnapshot.size;
-      
-      // Solicitudes clientes pendientes
-      const clientesQuery = query(
-        collection(db, 'solicitudes_cliente'),
-        where('estado', '==', 'pendiente')
+      // Solicitudes de campañas
+      const solicitudesCampanaQuery = query(
+        collection(db, 'solicitudes_campana'),
+        where('estado', 'in', ['pendiente', 'en_revision'])
       );
-      const clientesSnapshot = await getDocs(clientesQuery);
-      console.log('👥 Solicitudes cliente pendientes:', clientesSnapshot.size);
-
+      const solicitudesCampanaSnapshot = await getDocs(solicitudesCampanaQuery);
+      
+      // Solicitudes de productos
+      const solicitudesProductoQuery = query(
+        collection(db, 'solicitudes_producto'),
+        where('estado', 'in', ['pendiente', 'en_revision'])
+      );
+      const solicitudesProductoSnapshot = await getDocs(solicitudesProductoQuery);
+      
+      // Clientes
+      const clientesSnapshot = await getDocs(collection(db, 'clientes'));
+      
       // Campañas
       const campañasSnapshot = await getDocs(collection(db, 'campañas'));
-      console.log('📢 Campañas totales:', campañasSnapshot.size);
+
+      const totalSolicitudesPendientes = 
+        solicitudesEmpresaSnapshot.size + 
+        solicitudesProveedorSnapshot.size + 
+        solicitudesCampanaSnapshot.size + 
+        solicitudesProductoSnapshot.size;
 
       const nuevasStats = {
         totalEmpresas: empresasSnapshot.size,
@@ -171,37 +199,47 @@ function AdminPanel({ user }) {
         </button>
       </div>
 
-      {/* Navegación de pestañas */}
-      <div className="flex gap-4 mb-6 border-b border-gray-200">
-        <button 
-          className={`px-4 py-2 font-medium ${
-            tab === "overview" 
-              ? "border-b-2 border-blue-500 text-blue-600" 
-              : "text-gray-500 hover:text-gray-700"
-          }`} 
+      {/* Pestañas de navegación */}
+      <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+        <button
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "overview"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
           onClick={() => setTab("overview")}
         >
           📊 Resumen
         </button>
-        <button 
-          className={`px-4 py-2 font-medium ${
-            tab === "empresas" 
-              ? "border-b-2 border-blue-500 text-blue-600" 
-              : "text-gray-500 hover:text-gray-700"
-          }`} 
+        <button
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "empresas"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
           onClick={() => setTab("empresas")}
         >
-          🏪 Empresas
+          🏢 Empresas
         </button>
-        <button 
-          className={`px-4 py-2 font-medium ${
-            tab === "campañas" 
-              ? "border-b-2 border-blue-500 text-blue-600" 
-              : "text-gray-500 hover:text-gray-700"
-          }`} 
+        <button
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "campañas"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
           onClick={() => setTab("campañas")}
         >
-          📢 Campañas
+          📢 Solicitudes Campañas
+        </button>
+        <button
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "productos"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+          onClick={() => setTab("productos")}
+        >
+          📦 Productos
         </button>
       </div>
 
@@ -242,125 +280,109 @@ function AdminPanel({ user }) {
             </div>
           </div>
 
+          {/* Panel de Acceso Rápido */}
+          <QuickAccessPanel />
+
           {/* Accesos rápidos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">🏪 Gestión de Proveedores</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/admin/solicitudes-registro" 
-                  className="block w-full text-left px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm text-blue-700 transition-colors"
-                >
-                  📋 Solicitudes Pendientes ({stats.solicitudesPendientes})
-                </Link>
-                <Link 
-                  to="/admin/proveedores" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  🏪 Ver Todos los Proveedores
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">👥 Gestión de Clientes</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/admin/solicitudes-cliente" 
-                  className="block w-full text-left px-4 py-2 bg-purple-50 hover:bg-purple-100 rounded-lg text-sm text-purple-700 transition-colors"
-                >
-                  📋 Solicitudes Pendientes ({stats.clientesPendientes})
-                </Link>
-                <Link 
-                  to="/admin/validacion-clientes" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  ✅ Validar Clientes
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">📊 Catastro y Datos</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/admin/catastro-masivo" 
-                  className="block w-full text-left px-4 py-2 bg-green-50 hover:bg-green-100 rounded-lg text-sm text-green-700 transition-colors"
-                >
-                  📊 Catastro Masivo
-                </Link>
-                <Link 
-                  to="/admin/panel-validacion" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  🔍 Panel de Validación
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">⚙️ Configuración</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/admin/marcas" 
-                  className="block w-full text-left px-4 py-2 bg-yellow-50 hover:bg-yellow-100 rounded-lg text-sm text-yellow-700 transition-colors"
-                >
-                  🏷️ Gestión de Marcas
-                </Link>
-                <Link 
-                  to="/admin/categorias" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  📂 Gestión de Categorías
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">📈 Reportes y Stats</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/admin/estadisticas" 
-                  className="block w-full text-left px-4 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-lg text-sm text-indigo-700 transition-colors"
-                >
-                  📊 Panel de Estadísticas
-                </Link>
-                <Link 
-                  to="/admin/gestion-tickets" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  🎫 Gestión de Tickets
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-lg text-gray-900 mb-4">🚗 Servicios</h3>
-              <div className="space-y-3">
-                <Link 
-                  to="/servicios/seguros" 
-                  className="block w-full text-left px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm text-blue-700 transition-colors"
-                >
-                  🛡️ Gestión de Seguros
-                </Link>
-                <Link 
-                  to="/mis-recordatorios" 
-                  className="block w-full text-left px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors"
-                >
-                  🔔 Mis Recordatorios
-                </Link>
-              </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Acciones Rápidas</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <Link
+                to="/admin/empresas"
+                className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-lg text-center transition-colors"
+              >
+                <div className="text-2xl mb-2">🏢</div>
+                <div className="font-medium">Gestionar Empresas</div>
+                <div className="text-sm opacity-90">Ver y editar perfiles</div>
+              </Link>
+              
+              <Link
+                to="/admin/solicitudes-empresas"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white p-4 rounded-lg text-center transition-colors"
+              >
+                <div className="text-2xl mb-2">📋</div>
+                <div className="font-medium">Solicitudes Empresas</div>
+                <div className="text-sm opacity-90">Revisar pendientes</div>
+              </Link>
+              
+              <button
+                onClick={() => setTab("campañas")}
+                className="bg-green-600 hover:bg-green-700 text-white p-4 rounded-lg text-center transition-colors"
+              >
+                <div className="text-2xl mb-2">📢</div>
+                <div className="font-medium">Solicitudes Campañas</div>
+                <div className="text-sm opacity-90">Aprobar campañas</div>
+              </button>
+              
+              <button
+                onClick={() => setTab("productos")}
+                className="bg-orange-600 hover:bg-orange-700 text-white p-4 rounded-lg text-center transition-colors"
+              >
+                <div className="text-2xl mb-2">📦</div>
+                <div className="font-medium">Solicitudes Productos</div>
+                <div className="text-sm opacity-90">Aprobar productos</div>
+              </button>
+              
+              <Link
+                to="/admin/estadisticas"
+                className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-lg text-center transition-colors"
+              >
+                <div className="text-2xl mb-2">📊</div>
+                <div className="font-medium">Estadísticas</div>
+                <div className="text-sm opacity-90">Ver métricas</div>
+              </Link>
             </div>
           </div>
         </div>
       )}
 
-      {tab === "empresas" && <AdminStoreList />}
-      
+      {tab === "empresas" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Gestión de Empresas</h2>
+            <button
+              onClick={() => setMostrarCrearEmpresa(!mostrarCrearEmpresa)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              {mostrarCrearEmpresa ? "Ocultar Formulario" : "Crear Nueva Empresa"}
+            </button>
+          </div>
+          
+          {mostrarCrearEmpresa && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <CrearEmpresaPublica />
+            </div>
+          )}
+          
+          <AdminStoreList />
+        </div>
+      )}
+
       {tab === "campañas" && (
         <div className="space-y-6">
-          <CampaignForm />
-          <CampaignList />
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Gestión de Solicitudes de Campañas</h2>
+            <div className="text-sm text-gray-600">
+              Revisa y aprueba las campañas que los proveedores solicitan publicar
+            </div>
+          </div>
+          
+          {console.log('🔍 Renderizando pestaña de campañas')}
+          <AdminSolicitudesCampana />
+        </div>
+      )}
+
+      {tab === "productos" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Gestión de Solicitudes de Productos</h2>
+            <div className="text-sm text-gray-600">
+              Revisa y aprueba los productos que los proveedores solicitan publicar
+            </div>
+          </div>
+          
+          {console.log('🔍 Renderizando pestaña de productos')}
+          <AdminSolicitudesProducto />
         </div>
       )}
     </div>

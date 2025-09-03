@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy, setDoc } from 'firebase/firestore';
 
 // Utilidad recursiva para mostrar todos los campos y tipos
 
@@ -432,7 +432,6 @@ export default function SolicitudesRegistro() {
         admin_activador: user?.email,
         solicitud_origen_id: solicitudId,
         descripcion: descripcion_completa,
-        descripcion_completa: descripcion_completa,
 
         // Configuraciones mejoradas
         logoAsignado: !!datosPerfilForm.logo_url,
@@ -444,7 +443,8 @@ export default function SolicitudesRegistro() {
         // Metadatos de revisión
         revision_completada: true,
         fecha_revision: new Date(),
-        admin_revisor: user?.email
+        admin_revisor: user?.email,
+        rol: 'proveedor' // Rol unificado para todas las empresas
       };
 
       await addDoc(collection(db, 'empresas'), empresaData);
@@ -558,12 +558,12 @@ export default function SolicitudesRegistro() {
         const nuevoUsuario = {
           uid: nuevoUid,
           email: credencialesForm.email,
-          rol: 'empresa', // o 'proveedor', según tu lógica
+          rol: 'proveedor', // Rol unificado para todas las empresas
           nombre_empresa: credencialesForm.nombre_empresa || '',
           fecha_creacion: new Date(),
           activo: true
         };
-        await addDoc(collection(db, 'usuarios'), nuevoUsuario);
+        await setDoc(doc(db, 'usuarios', nuevoUid), nuevoUsuario);
       }
 
       // 2. Actualizar la solicitud a estado "credenciales_asignadas"

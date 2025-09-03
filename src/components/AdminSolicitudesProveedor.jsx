@@ -265,7 +265,7 @@ export default function AdminSolicitudesProveedor() {
         return cleaned;
       };
 
-      // 2. Crear empresa en la colección 'empresas' con estado 'Activa'
+              // 2. Crear empresa en la colección 'empresas' con estado 'activa'
       const nuevaEmpresaRaw = {
         // Información básica de la empresa
         nombre: solicitud.nombre_empresa || 'Sin nombre',
@@ -306,7 +306,7 @@ export default function AdminSolicitudesProveedor() {
         marcas: solicitud.marcas_vehiculos || [],
         
         // Estado y fechas
-        estado: 'Activa',
+        estado: 'activa',
         fecha_postulacion: solicitud.fecha_solicitud || new Date(),
         fecha_aprobacion: new Date(),
         fecha_registro: new Date(),

@@ -1,11 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import HeroSection from '../components/HeroSection';
 import SearchBarUnificado from '../components/SearchBarUnificado';
 import AdBanner from '../components/AdBanner';
 import { testEmpresasConnection } from '../utils/testEmpresas';
+import { ESTADOS_EMPRESA } from '../utils/empresaStandards';
+import { useImageUrl } from '../hooks/useImageUrl';
+
+// Componente para mostrar logo con manejo de URLs de Firebase Storage
+function LogoImage({ logo, nombre, className = "max-h-24 max-w-24 object-contain" }) {
+  const { imageUrl, loading, error } = useImageUrl(logo);
+
+  if (!logo) {
+    return (
+      <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+        <span className="text-2xl font-bold text-white">
+          {nombre ? nombre.charAt(0).toUpperCase() : '?'}
+        </span>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+        <span className="text-lg font-bold text-white">!</span>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      className={className} 
+      src={imageUrl} 
+      alt={nombre}
+      onError={(e) => {
+        e.target.style.display = 'none';
+        e.target.nextSibling.style.display = 'flex';
+      }}
+    />
+  );
+}
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -14,116 +59,65 @@ const HomePage = () => {
   const [loadingEmpresas, setLoadingEmpresas] = useState(true);
   const [filtroTipoEmpresa, setFiltroTipoEmpresa] = useState('');
 
-  // Cargar empresas activas
+  // Cargar empresas activas con real-time updates
   useEffect(() => {
     const cargarEmpresasActivas = async () => {
       try {
         setLoadingEmpresas(true);
-        console.log('🔍 Buscando empresas activas...');
+        console.log('🔍 Configurando listener real-time para empresas activas...');
         
         // Ejecutar test de debug primero
         const testResult = await testEmpresasConnection();
         console.log('🧪 Resultado del test:', testResult);
         
-        let empresasEncontradas = [];
+        // Configurar listener real-time para empresas activas
+        const q = query(
+          collection(db, 'empresas'),
+          where('estado', 'in', [ESTADOS_EMPRESA.ACTIVA, ESTADOS_EMPRESA.VALIDADA]),
+          orderBy('fecha_creacion', 'desc'),
+          limit(20)
+        );
         
-        // Intento 1: Empresas con estado 'activa' (minúscula, como se crea en SolicitudesRegistro)
-        try {
-          console.log('🔄 Buscando empresas con estado "activa" o "validada"...');
-          const q1 = query(
-            collection(db, 'empresas'),
-            where('estado', 'in', ['activa', 'validada']),
-            limit(8)
-          );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          console.log('📊 Empresas activas actualizadas en tiempo real:', snapshot.size);
           
-          const snapshot1 = await getDocs(q1);
-          console.log('📊 Empresas con estado "activa" o "validada":', snapshot1.size);
+          const empresasEncontradas = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
           
-          if (snapshot1.size > 0) {
-            empresasEncontradas = snapshot1.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            
-            // Ordenar manualmente por fecha_registro si existe
-            empresasEncontradas.sort((a, b) => {
-              const fechaA = a.fecha_registro?.toDate?.() || a.fecha_registro || new Date(0);
-              const fechaB = b.fecha_registro?.toDate?.() || b.fecha_registro || new Date(0);
-              return fechaB - fechaA;
-            });
-          }
-        } catch (error) {
-          console.log('⚠️ Error con primera consulta:', error.message);
-        }
+          // Ordenar por fecha de creación (más recientes primero)
+          empresasEncontradas.sort((a, b) => {
+            const fechaA = a.fecha_creacion?.toDate?.() || a.fecha_creacion || new Date(0);
+            const fechaB = b.fecha_creacion?.toDate?.() || b.fecha_creacion || new Date(0);
+            return fechaB - fechaA;
+          });
+          
+          console.log('✅ Empresas activas cargadas:', empresasEncontradas.length);
+          setEmpresasActivas(empresasEncontradas);
+          setLoadingEmpresas(false);
+        }, (error) => {
+          console.error('❌ Error en listener real-time:', error);
+          setLoadingEmpresas(false);
+        });
         
-        // Intento 2: Si no se encontraron, intentar con 'Activa' (mayúscula)
-        if (empresasEncontradas.length === 0) {
-          try {
-            console.log('🔄 Buscando empresas con estado "Activa"...');
-            const q2 = query(
-              collection(db, 'empresas'),
-              where('estado', '==', 'Activa'),
-              limit(8)
-            );
-            
-            const snapshot2 = await getDocs(q2);
-            console.log('📊 Empresas con estado "Activa":', snapshot2.size);
-            
-            if (snapshot2.size > 0) {
-              empresasEncontradas = snapshot2.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-              }));
-            }
-          } catch (error) {
-            console.log('⚠️ Error con segunda consulta:', error.message);
-          }
-        }
-        
-        // Intento 3: Si aún no hay resultados, traemos todas las empresas para debug
-        if (empresasEncontradas.length === 0) {
-          console.log('🔄 Trayendo todas las empresas para análisis...');
-          try {
-            const q3 = query(
-              collection(db, 'empresas'),
-              limit(10)
-            );
-            const snapshot3 = await getDocs(q3);
-            console.log('📊 Total empresas encontradas:', snapshot3.size);
-            
-            // Log de estados para debug
-            snapshot3.docs.forEach(doc => {
-              const data = doc.data();
-              console.log(`🏢 Empresa: ${data.nombre || 'Sin nombre'} - Estado: "${data.estado}" - Tipo: ${typeof data.estado}`);
-            });
-            
-            // Tomar solo las que tienen estado activo (cualquier formato)
-            empresasEncontradas = snapshot3.docs
-              .map(doc => ({ id: doc.id, ...doc.data() }))
-              .filter(empresa => {
-                const estado = (empresa.estado || '').toLowerCase();
-                return estado === 'activa' || estado === 'validada';
-              })
-              .slice(0, 8);
-            
-            console.log('✅ Empresas activas filtradas:', empresasEncontradas.length);
-          } catch (error) {
-            console.error('❌ Error con consulta de debug:', error);
-          }
-        }
-        
-        console.log('✅ Empresas finales cargadas:', empresasEncontradas.length);
-        setEmpresasActivas(empresasEncontradas);
+        // Cleanup function
+        return unsubscribe;
         
       } catch (error) {
-        console.error('❌ Error general cargando empresas activas:', error);
-        setEmpresasActivas([]);
-      } finally {
+        console.error('❌ Error configurando listener:', error);
         setLoadingEmpresas(false);
       }
     };
 
-    cargarEmpresasActivas();
+    const unsubscribe = cargarEmpresasActivas();
+    
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, []);
 
   // Aplicar filtros
@@ -226,6 +220,68 @@ const HomePage = () => {
         </div>
       </div>
       
+      {/* Sección Especial de Reciclaje */}
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              ♻️ Reciclaje Automotriz en AV10 de Julio
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Construyendo una comunidad automotriz sostenible. Conectamos clientes con proveedores de reciclaje 
+              para un futuro más verde y responsable.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div className="text-center">
+              <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🌱</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Impacto Ambiental</h3>
+              <p className="text-gray-600">
+                Reducimos la contaminación y promovemos la economía circular en la industria automotriz
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🤝</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Comunidad Integrada</h3>
+              <p className="text-gray-600">
+                Clientes y proveedores trabajando juntos por un futuro más sostenible
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-purple-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">💡</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Educación</h3>
+              <p className="text-gray-600">
+                Aprendemos juntos las mejores prácticas de reciclaje automotriz
+              </p>
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <button
+              onClick={() => navigate('/servicios/reciclaje')}
+              className="bg-green-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-green-700 transition-colors mr-4"
+            >
+              ♻️ Conocer Más Sobre Reciclaje
+            </button>
+            <button
+              onClick={() => navigate('/registro-empresa')}
+              className="bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors"
+            >
+              🏭 Registrarme como Empresa de Reciclaje
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Banner publicitario */}
       <div className="bg-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -240,7 +296,7 @@ const HomePage = () => {
             Empresas Verificadas
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Descubre las empresas automotrices activas y verificadas en nuestra plataforma
+            Descubre las empresas automotrices activas y verificadas en nuestra plataforma. Haz clic en cualquier empresa para ver su perfil completo en una nueva pestaña.
           </p>
           {/* Debug info - temporal */}
           <div className="mt-4 text-sm text-gray-500">
@@ -278,23 +334,15 @@ const HomePage = () => {
                 <div 
                   key={empresa.id} 
                   className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/empresa/${empresa.id}`)}
+                  onClick={() => window.open(`/empresa/${empresa.id}`, '_blank')}
                 >
                   {/* Logo de la empresa */}
                   <div className="h-32 bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                    {empresa.logo ? (
-                      <img 
-                        src={empresa.logo} 
-                        alt={empresa.nombre}
-                        className="max-h-24 max-w-24 object-contain"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl font-bold text-white">
-                          {empresa.nombre ? empresa.nombre.charAt(0).toUpperCase() : '?'}
-                        </span>
-                      </div>
-                    )}
+                    <LogoImage 
+                      logo={empresa.logo_url || empresa.logo} 
+                      nombre={empresa.nombre}
+                      className="max-h-24 max-w-24 object-contain"
+                    />
                   </div>
                   
                   {/* Información de la empresa */}
@@ -303,26 +351,31 @@ const HomePage = () => {
                       <h3 className="font-semibold text-gray-900 truncate">
                         {empresa.nombre || 'Sin nombre'}
                       </h3>
-                      <span className={
-                        `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ` +
-                        ((empresa.tipoEmpresa || '').toLowerCase() === 'proveedor'
-                          ? 'bg-blue-100 text-blue-800'
-                          : (empresa.tipoEmpresa || '').toLowerCase() === 'pyme'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : (empresa.tipoEmpresa || '').toLowerCase() === 'empresa'
-                          ? 'bg-green-100 text-green-800'
-                          : (empresa.tipoEmpresa || '').toLowerCase() === 'emprendimiento'
-                          ? 'bg-purple-100 text-purple-800'
-                          : (empresa.tipoEmpresa || '').toLowerCase() === 'local'
-                          ? 'bg-pink-100 text-pink-800'
-                          : (empresa.tipoEmpresa || '').toLowerCase() === 'premium'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-gray-100 text-gray-800')
-                      }>
-                        {empresa.tipoEmpresa
-                          ? `🏷️ ${empresa.tipoEmpresa.charAt(0).toUpperCase() + empresa.tipoEmpresa.slice(1)}`
-                          : '🏷️ Sin tipo'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={
+                          `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ` +
+                          ((empresa.tipoEmpresa || '').toLowerCase() === 'proveedor'
+                            ? 'bg-blue-100 text-blue-800'
+                            : (empresa.tipoEmpresa || '').toLowerCase() === 'pyme'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : (empresa.tipoEmpresa || '').toLowerCase() === 'empresa'
+                            ? 'bg-green-100 text-green-800'
+                            : (empresa.tipoEmpresa || '').toLowerCase() === 'emprendimiento'
+                            ? 'bg-purple-100 text-purple-800'
+                            : (empresa.tipoEmpresa || '').toLowerCase() === 'local'
+                            ? 'bg-pink-100 text-pink-800'
+                            : (empresa.tipoEmpresa || '').toLowerCase() === 'premium'
+                            ? 'bg-gray-800 text-white'
+                            : 'bg-gray-100 text-gray-800')
+                        }>
+                          {empresa.tipoEmpresa
+                            ? `🏷️ ${empresa.tipoEmpresa.charAt(0).toUpperCase() + empresa.tipoEmpresa.slice(1)}`
+                            : '🏷️ Sin tipo'}
+                        </span>
+                        <span className="text-xs text-gray-500" title="Abrir en nueva pestaña">
+                          ↗️
+                        </span>
+                      </div>
                     </div>
                     
                     <p className="text-sm text-gray-600 mb-3 line-clamp-2">
@@ -337,20 +390,41 @@ const HomePage = () => {
                       </div>
                     )}
                     
-                    {/* Categorías */}
-                    {empresa.categorias && empresa.categorias.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {empresa.categorias.slice(0, 2).map((categoria, index) => (
+                    {/* Servicios */}
+                    {empresa.servicios && empresa.servicios.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        <span className="text-xs text-gray-500 font-medium mb-1 block w-full">Servicios:</span>
+                        {empresa.servicios.slice(0, 2).map((servicio, index) => (
                           <span 
                             key={index}
                             className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
                           >
-                            {categoria}
+                            {servicio}
                           </span>
                         ))}
-                        {empresa.categorias.length > 2 && (
+                        {empresa.servicios.length > 2 && (
                           <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">
-                            +{empresa.categorias.length - 2} más
+                            +{empresa.servicios.length - 2} más
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Marcas */}
+                    {empresa.marcas && empresa.marcas.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-500 font-medium mb-1 block w-full">Marcas:</span>
+                        {empresa.marcas.slice(0, 2).map((marca, index) => (
+                          <span 
+                            key={index}
+                            className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded"
+                          >
+                            {marca}
+                          </span>
+                        ))}
+                        {empresa.marcas.length > 2 && (
+                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">
+                            +{empresa.marcas.length - 2} más
                           </span>
                         )}
                       </div>

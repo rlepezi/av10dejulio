@@ -23,6 +23,7 @@ const ReviewForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   // Verificar si el usuario ya ha hecho una reseña
   useEffect(() => {
@@ -87,7 +88,7 @@ const ReviewForm = ({
         puntaje,
         comentario: comentario.trim(),
         fecha: serverTimestamp(),
-        estado: 'pendiente' // Para moderación
+        estado: 'aprobada' // Aprobada automáticamente para clientes logueados
       };
 
       if (productoId) {
@@ -99,7 +100,13 @@ const ReviewForm = ({
       setPuntaje(0);
       setComentario('');
       setHasReviewed(true);
+      setSuccess(true);
       onReviewSubmitted();
+      
+      // Ocultar mensaje de éxito después de 3 segundos
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
       
     } catch (err) {
       console.error('Error submitting review:', err);
@@ -125,6 +132,11 @@ const ReviewForm = ({
         <p className="text-green-800">
           ✅ Ya has dejado una reseña para este {productoId ? 'producto' : 'proveedor'}
         </p>
+        {success && (
+          <p className="text-green-700 text-sm mt-2">
+            🎉 ¡Tu reseña se ha publicado exitosamente!
+          </p>
+        )}
       </div>
     );
   }

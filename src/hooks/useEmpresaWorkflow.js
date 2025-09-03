@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { EmpresaWorkflow, ESTADOS_EMPRESA } from '../utils/empresaWorkflow';
+import { EmpresaWorkflow } from '../utils/empresaWorkflow';
+import { ESTADOS_EMPRESA } from '../utils/empresaStandards';
 
 export function useEmpresaWorkflow() {
   const [loading, setLoading] = useState(false);

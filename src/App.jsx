@@ -23,9 +23,8 @@ import RegistrarEmpresaValidada from "./pages/RegistrarEmpresaValidada";
 // Componentes para rutas públicas principales
 import RegistroCliente from "./components/RegistroCliente";
 import RegistroAgente from "./components/RegistroAgente";
-import RegistroProveedor from "./components/RegistroProveedor";
+import RegistroEmpresa from "./components/RegistroEmpresa";
 import SolicitudComunidad from "./components/SolicitudComunidad";
-import LocalProvidersPage from "./pages/LocalProvidersPage";
 import PymesLocalesPage from "./pages/PymesLocalesPage";
 import AreaClientePage from "./pages/AreaClientePage";
 import FAQPage from "./pages/FAQPage";
@@ -36,17 +35,34 @@ import SegurosPage from "./pages/SegurosPage";
 import RevisionTecnicaPage from "./pages/RevisionTecnicaPage";
 import VulcanizacionesPage from "./pages/VulcanizacionesPage";
 import ReciclajePage from "./pages/ReciclajePage";
+import DashboardReciclajeCliente from "./pages/DashboardReciclajeCliente";
+import DashboardReciclajeProveedor from "./pages/DashboardReciclajeProveedor";
+import RegistroEmpresaReciclaje from "./pages/RegistroEmpresaReciclaje";
 import RecordatoriosPage from "./pages/RecordatoriosPage";
 import MasInformacionProveedorPage from "./pages/MasInformacionProveedorPage";
 import PerfilEmpresaPublica from "./pages/PerfilEmpresaPublica";
+import DashboardProveedorInterno from "./pages/DashboardProveedorInterno";
+import DashboardClienteInterno from "./pages/DashboardClienteInterno";
+
+
+// Componentes de empresa
+import MiEmpresaPage from "./components/MiEmpresaPage";
+import SolicitudCampanaPage from "./components/SolicitudCampanaPage";
+import SolicitudProductoPage from "./components/SolicitudProductoPage";
 
 // Componentes globales
 import QuickFeedbackWidget from "./components/QuickFeedbackWidget";
 import NotificationManager from "./components/NotificationManager";
 import FirebaseTest from "./components/FirebaseTest";
+import TestImageConversion from "./components/TestImageConversion";
+import TestLogoUpload from "./components/TestLogoUpload";
+import TestLogoDisplay from "./components/TestLogoDisplay";
+// import AuthDebug from "./components/AuthDebug"; // DESHABILITADO
+import UserCleanupAdmin from "./components/UserCleanupAdmin";
 
 // Inicialización de datos
 import { initializeServiceData } from "./utils/initializeData";
+import { initializeRecyclingData } from "./utils/initializeRecyclingData";
 
 function App() {
   const [activeUser, setActiveUser] = useState(null);
@@ -56,6 +72,8 @@ function App() {
   useEffect(() => {
     // Inicializar datos de servicio si es necesario
     initializeServiceData();
+    // Inicializar datos de reciclaje si es necesario
+    initializeRecyclingData();
 
     // Escuchar cambios de autenticación
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -133,16 +151,57 @@ function App() {
             
             {/* Rutas de agente */}
             <Route path="/dashboard/agente" element={<DashboardAgente />} />
-            <Route path="/agente/empresas-asignadas" element={<EmpresasAsignadasAgente />} />
+            <Route path="/agente/empresas-asignadas" element={<DashboardAgente />} />
             <Route path="/agente/nueva-empresa" element={<RegistrarEmpresaValidada />} />
             <Route path="/agente/empresa/:empresaId" element={<EmpresaDetalleAgente />} />
             
+            {/* Dashboard de empresa */}
+            <Route
+              path="/dashboard/proveedor"
+              element={
+                <ProtectedRoute>
+                  <DashboardProveedorInterno />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Rutas de empresa */}
+            <Route
+              path="/empresa/mi-empresa"
+              element={
+                <ProtectedRoute>
+                  <MiEmpresaPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
+              path="/empresa/solicitar-campana"
+              element={
+                <ProtectedRoute>
+                  <SolicitudCampanaPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
+              path="/empresa/solicitar-producto"
+              element={
+                <ProtectedRoute>
+                  <SolicitudProductoPage />
+                </ProtectedRoute>
+              }
+            />
+            
             {/* Rutas críticas para navegación desde HeroSection */}
             <Route path="/registro-cliente" element={<RegistroCliente />} />
-            <Route path="/registro-proveedor" element={<RegistroProveedor />} />
+            <Route path="/registro-empresa" element={<RegistroEmpresa />} />
             <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />
-            <Route path="/proveedores" element={<LocalProvidersPage />} />
+            {/* Páginas públicas de empresas */}
+            <Route path="/empresas" element={<PymesLocalesPage />} />
+            <Route path="/proveedores" element={<PymesLocalesPage />} />
             <Route path="/proveedores-locales" element={<PymesLocalesPage />} />
+            <Route path="/empresas-locales" element={<PymesLocalesPage />} />
             <Route path="/area-cliente" element={<AreaClientePage />} />
             <Route path="/recursos" element={<EducationalResourcesPage />} />
             <Route path="/recursos/:resourceId" element={<ResourceDetailPage />} />
@@ -155,14 +214,34 @@ function App() {
             <Route path="/servicios/revision-tecnica" element={<RevisionTecnicaPage />} />
             <Route path="/servicios/vulcanizaciones" element={<VulcanizacionesPage />} />
             <Route path="/servicios/reciclaje" element={<ReciclajePage />} />
+        <Route path="/dashboard/reciclaje/cliente" element={<DashboardReciclajeCliente />} />
+        <Route path="/dashboard/reciclaje/proveedor" element={<DashboardReciclajeProveedor />} />
+        <Route path="/registro/empresa/reciclaje" element={<RegistroEmpresaReciclaje />} />
             <Route path="/mis-recordatorios" element={<RecordatoriosPage />} />
             
-            {/* Perfil público de proveedor */}
-            <Route path="/proveedor/:id" element={<MasInformacionProveedorPage />} />
+            {/* Perfil público de empresa */}
+            <Route path="/empresa/:id" element={<PerfilEmpresaPublica />} />
+            <Route path="/proveedor/:id" element={<PerfilEmpresaPublica />} />
             <Route path="/empresa/:empresaId" element={<PerfilEmpresaPublica />} />
+            <Route path="/perfil-proveedor/:empresaId" element={<DashboardProveedorInterno />} />
             
-            {/* Test de Firebase para debug */}
-            <Route path="/firebase-test" element={<FirebaseTest />} />
+            {/* Dashboard interno del cliente */}
+            <Route path="/dashboard/cliente" element={<DashboardClienteInterno />} />
+            <Route path="/dashboard/cliente/:clienteId" element={<DashboardClienteInterno />} />
+
+            
+
+            
+                      {/* Test de Firebase para debug */}
+          <Route path="/firebase-test" element={<FirebaseTest />} />
+          
+          {/* Test de conversión de imágenes */}
+          <Route path="/test-images" element={<TestImageConversion />} />
+          <Route path="/test-logo-upload" element={<TestLogoUpload />} />
+          <Route path="/test-logo-display" element={<TestLogoDisplay />} />
+          
+          {/* Ruta temporal para limpieza de usuarios */}
+          <Route path="/admin/cleanup-users" element={<UserCleanupAdmin />} />
             
             {/* Ruta catch-all para manejar rutas no encontradas */}
             <Route path="*" element={<HomePage />} />
@@ -170,6 +249,9 @@ function App() {
 
           {/* Widget de feedback global */}
           <QuickFeedbackWidget />
+          
+          {/* Componente de debug temporal - DESHABILITADO */}
+          {/* <AuthDebug /> */}
         </div>
       </AuthProvider>
     </BrowserRouter>

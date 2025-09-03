@@ -7,7 +7,8 @@ import DashboardAgente from '../components/DashboardAgente';
 
 // Otros roles especializados
 import DashboardMecanico from '../components/DashboardMecanico';
-import RegistroPyme from '../components/RegistroPyme';
+import DashboardEmpresa from '../components/DashboardEmpresa';
+import RegistroEmpresa from '../components/RegistroEmpresa';
 
 // Dashboard de switch/redirección
 import DashboardSwitch from '../components/DashboardSwitch';
@@ -21,6 +22,16 @@ const OtherRoutes = () => {
         element={
           <ProtectedRoute>
             <DashboardSwitch />
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Dashboard específico para empresas */}
+      <Route
+        path="/dashboard/proveedor"
+        element={
+          <ProtectedRoute>
+            <DashboardEmpresa />
           </ProtectedRoute>
         }
       />
@@ -45,8 +56,8 @@ const OtherRoutes = () => {
         }
       />
       
-      {/* Registro para PYMEs */}
-      <Route path="/registro-pyme" element={<RegistroPyme />} />
+      {/* Registro para empresas */}
+      <Route path="/registro-empresa" element={<RegistroEmpresa />} />
       
       {/* Clientes que acceden directamente a areas */}
       <Route path="/clientes-area" element={

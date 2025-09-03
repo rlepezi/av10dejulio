@@ -249,7 +249,7 @@ export default function ListadoCategoriasAdmin() {
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {categoria.activa !== false ? 'Activa' : 'Inactiva'}
+                      {categoria.activa !== false ? 'activa' : 'Inactiva'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500 border-b">

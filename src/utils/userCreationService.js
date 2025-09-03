@@ -1,5 +1,5 @@
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { collection, addDoc, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 /**
@@ -80,6 +80,20 @@ export class UserCreationService {
 
       // Guardar en la colección perfiles_clientes
       const docRef = await addDoc(collection(db, 'perfiles_clientes'), perfilClienteData);
+
+      // Crear registro en la colección usuarios para asignar el rol
+      const usuarioData = {
+        uid: user.uid,
+        email: user.email,
+        rol: 'cliente',
+        nombre: `${nombres} ${apellidos}`,
+        fechaCreacion: new Date(),
+        activo: true,
+        perfilClienteId: docRef.id
+      };
+      
+      // Usar setDoc con el UID de Firebase Auth como ID del documento
+      await setDoc(doc(db, 'usuarios', user.uid), usuarioData);
 
       return {
         success: true,
@@ -195,6 +209,20 @@ export class UserCreationService {
 
       // Guardar en la colección empresas
       const docRef = await addDoc(collection(db, 'empresas'), empresaData);
+
+      // Crear registro en la colección usuarios para asignar el rol
+      const usuarioData = {
+        uid: user.uid,
+        email: user.email,
+        rol: 'proveedor',
+        nombre: nombre_empresa,
+        empresaId: docRef.id,
+        fechaCreacion: new Date(),
+        activo: true
+      };
+      
+      // Usar setDoc con el UID de Firebase Auth como ID del documento
+      await setDoc(doc(db, 'usuarios', user.uid), usuarioData);
 
       return {
         success: true,

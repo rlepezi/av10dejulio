@@ -41,7 +41,7 @@ export default function HeaderMenu() {
     if (rol === "admin") {
       navigate("/admin");
     } else if (rol === "proveedor") {
-      navigate("/dashboard/proveedor");
+              navigate("/dashboard/proveedor");
     } else {
       // Para usuarios no autenticados o con rol distinto, navegar a /proveedores
       navigate("/proveedores");
@@ -84,11 +84,11 @@ export default function HeaderMenu() {
                   <button
                     className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm"
                     onClick={() => {
-                      navigate("/agente/empresas-asignadas");
+                      navigate("/dashboard/agente");
                       setShowAgenteMenu(false);
                     }}
                   >
-                    🏢 Empresas Asignadas
+                    🗂 Mi Dashboard
                   </button>
                   <button
                     className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 text-sm"
@@ -520,7 +520,7 @@ function UserProfileMenu({ user, rol, onLogout, navigate }) {
   const getRolDisplayName = () => {
     switch(rol) {
       case 'admin': return 'Administrador';
-      case 'proveedor': return 'Proveedor';
+      case 'empresa': return 'Empresa';
       case 'agente': return 'Agente de Campo';
       case 'mecanico': return 'Mecánico';
       case 'cliente': return 'Cliente';
@@ -531,7 +531,7 @@ function UserProfileMenu({ user, rol, onLogout, navigate }) {
   const getRolIcon = () => {
     switch(rol) {
       case 'admin': return '👑';
-      case 'proveedor': return '🏪';
+      case 'empresa': return '🏪';
       case 'agente': return '👨‍💼';
       case 'mecanico': return '🔧';
       case 'cliente': return '🚗';

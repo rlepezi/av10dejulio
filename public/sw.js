@@ -18,6 +18,11 @@ self.addEventListener('install', event => {
         console.log('Cache abierto');
         return cache.addAll(urlsToCache);
       })
+      .catch(error => {
+        console.error('Error instalando Service Worker:', error);
+        // Continuar con la instalación aunque falle el cache
+        return Promise.resolve();
+      })
   );
 });
 
@@ -25,15 +30,23 @@ self.addEventListener('install', event => {
 self.addEventListener('push', event => {
   console.log('Push recibido:', event);
   
-  if (!event.data) {
-    console.log('Push sin datos');
-    return;
+  let data = {};
+  let title = 'AV10 de Julio';
+  let body = 'Nueva notificación';
+  
+  if (event.data) {
+    try {
+      data = event.data.json();
+      title = data.notification?.title || title;
+      body = data.notification?.body || body;
+    } catch (error) {
+      console.error('Error parseando datos de push:', error);
+      // Usar datos por defecto si falla el parseo
+    }
   }
 
-  const data = event.data.json();
-  const title = data.notification?.title || 'AV10 de Julio';
   const options = {
-    body: data.notification?.body || 'Nueva notificación',
+    body: body,
     icon: '/logo192.png',
     badge: '/favicon.ico',
     tag: data.tag || 'general',
@@ -55,6 +68,9 @@ self.addEventListener('push', event => {
 
   event.waitUntil(
     self.registration.showNotification(title, options)
+      .catch(error => {
+        console.error('Error mostrando notificación:', error);
+      })
   );
 });
 
@@ -85,6 +101,9 @@ self.addEventListener('notificationclick', event => {
           return clients.openWindow(targetUrl);
         }
       })
+      .catch(error => {
+        console.error('Error manejando click de notificación:', error);
+      })
   );
 });
 
@@ -99,7 +118,11 @@ self.addEventListener('sync', event => {
 
 function doBackgroundSync() {
   // Aquí se pueden sincronizar datos pendientes
-  return Promise.resolve();
+  return Promise.resolve()
+    .catch(error => {
+      console.error('Error en background sync:', error);
+      // No lanzar el error para evitar que falle el sync
+    });
 }
 
 // Activación del Service Worker
@@ -116,11 +139,21 @@ self.addEventListener('activate', event => {
         })
       );
     })
+    .catch(error => {
+      console.error('Error activando Service Worker:', error);
+      // Continuar con la activación aunque falle la limpieza de cache
+      return Promise.resolve();
+    })
   );
 });
 
 // Interceptar solicitudes de red
 self.addEventListener('fetch', event => {
+  // Solo interceptar solicitudes GET
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
@@ -128,104 +161,23 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
-        return fetch(event.request);
-      }
-    )
-  );
-});
-
-// Manejar push notifications
-self.addEventListener('push', event => {
-  console.log('Push message recibido:', event);
-  
-  let notificationData = {};
-  
-  if (event.data) {
-    try {
-      notificationData = event.data.json();
-    } catch (e) {
-      notificationData = {
-        title: 'AV10 de Julio',
-        body: event.data.text() || 'Nueva notificación',
-        icon: '/logo192.png',
-        badge: '/logo192.png'
-      };
-    }
-  }
-
-  const defaultOptions = {
-    title: 'AV10 de Julio',
-    body: 'Nueva notificación disponible',
-    icon: '/logo192.png',
-    badge: '/logo192.png',
-    vibrate: [200, 100, 200],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'open',
-        title: 'Abrir App',
-        icon: '/logo192.png'
-      },
-      {
-        action: 'close',
-        title: 'Cerrar',
-        icon: '/logo192.png'
-      }
-    ]
-  };
-
-  const options = { ...defaultOptions, ...notificationData };
-
-  event.waitUntil(
-    self.registration.showNotification(options.title, options)
-  );
-});
-
-// Manejar clicks en las notificaciones
-self.addEventListener('notificationclick', event => {
-  console.log('Notification click recibido:', event);
-  
-  event.notification.close();
-
-  if (event.action === 'open') {
-    // Abrir la aplicación
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  } else if (event.action === 'close') {
-    // Simplemente cerrar la notificación (ya se cerró arriba)
-    return;
-  } else {
-    // Click en el cuerpo de la notificación
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then(clientList => {
-          // Si hay una ventana abierta, enfocarla
-          for (let i = 0; i < clientList.length; i++) {
-            const client = clientList[i];
-            if (client.url === '/' && 'focus' in client) {
-              return client.focus();
+        
+        // Intentar hacer fetch con manejo de errores
+        return fetch(event.request)
+          .catch(error => {
+            console.log('Fetch falló para:', event.request.url, error);
+            // Si es una solicitud de página, devolver una página de error básica
+            if (event.request.destination === 'document') {
+              return new Response(
+                '<html><body><h1>Sin conexión</h1><p>Esta página no está disponible sin conexión.</p></body></html>',
+                { headers: { 'Content-Type': 'text/html' } }
+              );
             }
-          }
-          // Si no hay ventana abierta, abrir una nueva
-          if (clients.openWindow) {
-            return clients.openWindow('/');
-          }
-        })
-    );
-  }
+            // Para otros recursos, devolver un error
+            throw error;
+          });
+      })
+  );
 });
 
-// Manejar sincronización en background
-self.addEventListener('sync', event => {
-  if (event.tag === 'background-sync') {
-    console.log('Background sync ejecutándose');
-    event.waitUntil(
-      // Aquí se pueden enviar datos pendientes cuando se restaure la conexión
-      Promise.resolve()
-    );
-  }
-});
+

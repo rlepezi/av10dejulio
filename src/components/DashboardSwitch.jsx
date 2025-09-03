@@ -18,10 +18,10 @@ export default function DashboardSwitch() {
     } else if (rol === "mecanico") {
       navigate("/dashboard/mecanico");
     } else if (rol === "cliente") {
-      navigate("/dashboard/cliente");
+      navigate(`/dashboard/cliente/${user.uid}`);
     } else {
       // Usuario sin rol específico, redirigir al dashboard general
-      navigate("/dashboard/cliente");
+      navigate(`/dashboard/cliente/${user.uid}`);
     }
   }, [user, rol, navigate]);
 

@@ -1,47 +1,47 @@
-// Estados de empresa en el sistema
-export const ESTADOS_EMPRESA = {
-  ENVIADA: 'Enviada',
-  EN_REVISION: 'En Revisión', 
-  ACTIVA: 'Activa',
-  RECHAZADA: 'Rechazada',
-  SUSPENDIDA: 'Suspendida',
-  VISITADA: 'Visitada'
-};
+// Estados de empresa en el sistema - UNIFICADOS
+import { ESTADOS_EMPRESA, FLUJO_EMPRESA, puedeTransicionar, obtenerSiguientesEstados, obtenerDescripcionEstado } from './empresaStandards.js';
+
+export const ESTADOS_EMPRESA_WORKFLOW = ESTADOS_EMPRESA;
 
 export const TRANSICIONES_PERMITIDAS = {
-  [ESTADOS_EMPRESA.ENVIADA]: [
-    ESTADOS_EMPRESA.EN_REVISION,
-    ESTADOS_EMPRESA.RECHAZADA,
-    ESTADOS_EMPRESA.VISITADA
+  [ESTADOS_EMPRESA.CATALOGADA]: [
+    ESTADOS_EMPRESA.PENDIENTE_VALIDACION
   ],
-  [ESTADOS_EMPRESA.EN_REVISION]: [
-    ESTADOS_EMPRESA.ACTIVA,
-    ESTADOS_EMPRESA.RECHAZADA,
-    ESTADOS_EMPRESA.VISITADA
+  [ESTADOS_EMPRESA.PENDIENTE_VALIDACION]: [
+    ESTADOS_EMPRESA.EN_VISITA,
+    ESTADOS_EMPRESA.RECHAZADA
   ],
-  [ESTADOS_EMPRESA.VISITADA]: [
-    ESTADOS_EMPRESA.EN_REVISION,
+  [ESTADOS_EMPRESA.EN_VISITA]: [
+    ESTADOS_EMPRESA.VALIDADA,
+    ESTADOS_EMPRESA.RECHAZADA
+  ],
+  [ESTADOS_EMPRESA.VALIDADA]: [
     ESTADOS_EMPRESA.ACTIVA,
     ESTADOS_EMPRESA.RECHAZADA
   ],
   [ESTADOS_EMPRESA.ACTIVA]: [
-    ESTADOS_EMPRESA.SUSPENDIDA
+    ESTADOS_EMPRESA.SUSPENDIDA,
+    ESTADOS_EMPRESA.INACTIVA
   ],
   [ESTADOS_EMPRESA.SUSPENDIDA]: [
     ESTADOS_EMPRESA.ACTIVA,
-    ESTADOS_EMPRESA.RECHAZADA
+    ESTADOS_EMPRESA.INACTIVA
   ],
+  [ESTADOS_EMPRESA.INACTIVA]: [], // Estado final
   [ESTADOS_EMPRESA.RECHAZADA]: [] // Estado final
 };
 
 export class EmpresaWorkflow {
   static puedeTransicionar(estadoActual, nuevoEstado) {
-    const transicionesPermitidas = TRANSICIONES_PERMITIDAS[estadoActual] || [];
-    return transicionesPermitidas.includes(nuevoEstado);
+    return puedeTransicionar(estadoActual, nuevoEstado, false);
   }
   
   static obtenerSiguientesPasos(estadoActual) {
-    return TRANSICIONES_PERMITIDAS[estadoActual] || [];
+    return obtenerSiguientesEstados(estadoActual, false);
+  }
+  
+  static obtenerDescripcionEstado(estado) {
+    return obtenerDescripcionEstado(estado, false);
   }
   
   static validarRequisitosActivacion(empresa) {
@@ -49,7 +49,8 @@ export class EmpresaWorkflow {
       webValidada: empresa.webValidada === true,
       logoAsignado: empresa.logoAsignado === true,
       informacionCompleta: !!(empresa.nombre && empresa.direccion && empresa.telefono),
-      sinConflictos: !empresa.flagConflicto
+      sinConflictos: !empresa.flagConflicto,
+      validadaPorAgente: empresa.estado === ESTADOS_EMPRESA.VALIDADA
     };
     
     const cumpleRequisitos = Object.values(requisitos).every(Boolean);
@@ -65,13 +66,32 @@ export class EmpresaWorkflow {
   
   static generarRazonCambioEstado(estadoAnterior, nuevoEstado, motivo = '') {
     const razones = {
-      [`${ESTADOS_EMPRESA.ENVIADA}-${ESTADOS_EMPRESA.EN_REVISION}`]: 'Empresa pasó a revisión manual',
-      [`${ESTADOS_EMPRESA.EN_REVISION}-${ESTADOS_EMPRESA.ACTIVA}`]: 'Validación completada exitosamente',
-      [`${ESTADOS_EMPRESA.VISITADA}-${ESTADOS_EMPRESA.ACTIVA}`]: 'Visita de agente completada y validada',
-      [`${ESTADOS_EMPRESA.ACTIVA}-${ESTADOS_EMPRESA.SUSPENDIDA}`]: 'Empresa suspendida por administrador'
+      [`${ESTADOS_EMPRESA.CATALOGADA}-${ESTADOS_EMPRESA.PENDIENTE_VALIDACION}`]: 'Empresa asignada a agente para validación',
+      [`${ESTADOS_EMPRESA.PENDIENTE_VALIDACION}-${ESTADOS_EMPRESA.EN_VISITA}`]: 'Agente programó visita de validación',
+      [`${ESTADOS_EMPRESA.EN_VISITA}-${ESTADOS_EMPRESA.VALIDADA}`]: 'Agente validó empresa en terreno',
+      [`${ESTADOS_EMPRESA.VALIDADA}-${ESTADOS_EMPRESA.ACTIVA}`]: 'Admin activó empresa completamente',
+      [`${ESTADOS_EMPRESA.ACTIVA}-${ESTADOS_EMPRESA.SUSPENDIDA}`]: 'Empresa suspendida por administrador',
+      [`${ESTADOS_EMPRESA.SUSPENDIDA}-${ESTADOS_EMPRESA.ACTIVA}`]: 'Empresa reactivada por administrador',
+      [`${ESTADOS_EMPRESA.ACTIVA}-${ESTADOS_EMPRESA.INACTIVA}`]: 'Empresa desactivada permanentemente'
     };
     
     const razonKey = `${estadoAnterior}-${nuevoEstado}`;
     return razones[razonKey] || motivo || `Cambio de ${estadoAnterior} a ${nuevoEstado}`;
+  }
+  
+  static obtenerFlujoCompleto() {
+    return FLUJO_EMPRESA;
+  }
+  
+  static esEstadoFinal(estado) {
+    return [ESTADOS_EMPRESA.INACTIVA, ESTADOS_EMPRESA.RECHAZADA].includes(estado);
+  }
+  
+  static esVisibleEnHome(estado) {
+    return FLUJO_EMPRESA[estado]?.visible_en_home || false;
+  }
+  
+  static puedeGestionar(estado) {
+    return FLUJO_EMPRESA[estado]?.puede_gestionar || false;
   }
 }

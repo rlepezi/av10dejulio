@@ -114,11 +114,11 @@ const CampaignCard = ({ campaign, onViewDetail }) => {
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            campaign.estado === 'Activa' 
+            campaign.estado === 'activa' 
               ? 'bg-green-100 text-green-800 border border-green-200' 
               : 'bg-gray-100 text-gray-800 border border-gray-200'
           }`}>
-            {campaign.estado || 'Activa'}
+            {campaign.estado || 'activa'}
           </span>
         </div>
 

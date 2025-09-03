@@ -184,6 +184,115 @@ async function crearTodasLasEmpresas() {
   console.log("🎉 Proceso completado");
 }
 
+// Función para crear empresas con estado 'ingresada' para testing del panel de validación
+async function crearEmpresasIngresadas() {
+  console.log("🏗️ Creando empresas con estado 'ingresada'...");
+  
+  const empresasIngresadas = [
+    {
+      nombre: "Taller Mecánico El Rápido",
+      direccion: "Av. Las Industrias #123, Pudahuel",
+      telefono: "+56 9 1234 5678",
+      email: "contacto@elrapido.cl",
+      categoria: "Taller Mecánico",
+      rubro: "Taller Mecánico",
+      descripcion: "Taller especializado en reparación y mantención de vehículos",
+      web: "https://www.elrapido.cl",
+      logo: "",
+      logoAsignado: false,
+      webValidada: false,
+      estado: "ingresada",
+      fechaCreacion: new Date(),
+      zona: "Pudahuel",
+      region: "Metropolitana",
+      ciudad: "Santiago"
+    },
+    {
+      nombre: "Repuestos Automotrices Central",
+      direccion: "Calle Comercial #456, Maipú",
+      telefono: "+56 9 2345 6789",
+      email: "ventas@centralrepuestos.cl",
+      categoria: "Repuestos",
+      rubro: "Repuestos",
+      descripcion: "Distribuidora de repuestos para todo tipo de vehículos",
+      web: "",
+      logo: "",
+      logoAsignado: false,
+      webValidada: false,
+      estado: "ingresada",
+      fechaCreacion: new Date(),
+      zona: "Maipú",
+      region: "Metropolitana",
+      ciudad: "Santiago"
+    },
+    {
+      nombre: "Lubricantes y Aceites Express",
+      direccion: "Av. Industrial #789, Quilicura",
+      telefono: "+56 9 3456 7890",
+      email: "info@lubricantesexpress.cl",
+      categoria: "Lubricantes",
+      rubro: "Lubricantes",
+      descripcion: "Venta de aceites y lubricantes para vehículos",
+      web: "https://www.lubricantesexpress.cl",
+      logo: "",
+      logoAsignado: false,
+      webValidada: false,
+      estado: "ingresada",
+      fechaCreacion: new Date(),
+      zona: "Quilicura",
+      region: "Metropolitana",
+      ciudad: "Santiago"
+    },
+    {
+      nombre: "Ferretería Industrial Los Andes",
+      direccion: "Calle Principal #321, Las Condes",
+      telefono: "+56 9 4567 8901",
+      email: "ventas@ferreterialosandes.cl",
+      categoria: "Ferretería",
+      rubro: "Ferretería",
+      descripcion: "Ferretería especializada en herramientas industriales",
+      web: "",
+      logo: "",
+      logoAsignado: false,
+      webValidada: false,
+      estado: "ingresada",
+      fechaCreacion: new Date(),
+      zona: "Las Condes",
+      region: "Metropolitana",
+      ciudad: "Santiago"
+    },
+    {
+      nombre: "Automotora Premium Chile",
+      direccion: "Av. Kennedy #654, Las Condes",
+      telefono: "+56 9 5678 9012",
+      email: "ventas@premiumchile.cl",
+      categoria: "Automotora",
+      rubro: "Automotora",
+      descripcion: "Venta de vehículos premium con garantía extendida",
+      web: "https://www.premiumchile.cl",
+      logo: "",
+      logoAsignado: false,
+      webValidada: false,
+      estado: "ingresada",
+      fechaCreacion: new Date(),
+      zona: "Las Condes",
+      region: "Metropolitana",
+      ciudad: "Santiago"
+    }
+  ];
+
+  for (let i = 0; i < empresasIngresadas.length; i++) {
+    try {
+      const docRef = await addDoc(collection(db, "empresas"), empresasIngresadas[i]);
+      console.log(`✅ Empresa ingresada ${i + 1}/5 creada:`, empresasIngresadas[i].nombre, "ID:", docRef.id);
+    } catch (error) {
+      console.error(`❌ Error creando empresa ingresada ${i + 1}:`, error);
+    }
+  }
+  
+  console.log("🎉 Empresas con estado 'ingresada' creadas");
+}
+
 // Función para crear solicitudes de ejemplo
 async function crearSolicitudesEjemplo() {
   console.log("📋 Creando solicitudes de ejemplo...");
@@ -302,6 +411,7 @@ async function crearCampañaEjemplo() {
 export { 
   crearEmpresaEjemplo, 
   crearTodasLasEmpresas, 
+  crearEmpresasIngresadas,
   crearSolicitudesEjemplo,
   crearSolicitudesClientesEjemplo,
   crearCampañaEjemplo, 

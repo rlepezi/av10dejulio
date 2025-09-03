@@ -84,8 +84,38 @@ export default function ProtectedClientRoute({ children }) {
     );
   }
 
+  // Verificar si el usuario tiene acceso
+      if (user && rol !== 'admin' && rol !== 'proveedor' && rol !== 'mecanico') {
+    // Usuario autenticado pero sin permisos de empresa
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-6xl mb-4">🚫</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Acceso Restringido</h2>
+          <p className="text-gray-600 mb-4">
+            Solo las empresas registradas pueden acceder a esta sección.
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => navigate('/registro-empresa')}
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              📝 Registrar mi Empresa
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              🏠 Volver al Inicio
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Si es admin, proveedor o mecánico, permitir acceso directo
-  if (rol === 'admin' || rol === 'proveedor' || rol === 'mecanico') {
+      if (rol === 'admin' || rol === 'proveedor' || rol === 'mecanico') {
     return children;
   }
 

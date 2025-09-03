@@ -41,7 +41,7 @@ const HeroSection = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <div className="text-2xl lg:text-3xl font-bold text-yellow-400">200+</div>
                 <div className="text-sm text-blue-200">Proveedores</div>
@@ -53,6 +53,10 @@ const HeroSection = () => {
               <div className="text-center">
                 <div className="text-2xl lg:text-3xl font-bold text-yellow-400">50+</div>
                 <div className="text-sm text-blue-200">Campañas</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl lg:text-3xl font-bold text-green-400">♻️</div>
+                <div className="text-sm text-blue-200">Reciclaje</div>
               </div>
             </div>
 
@@ -71,6 +75,12 @@ const HeroSection = () => {
                   className="border-2 border-white text-white hover:bg-white hover:text-blue-900 px-8 py-3 rounded-lg font-semibold text-lg transition-all"
                 >
                   🏪 PyMEs Locales
+                </button>
+                <button
+                  onClick={() => navigate('/servicios/reciclaje')}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 shadow-lg"
+                >
+                  ♻️ Reciclaje
                 </button>
               </div>
               

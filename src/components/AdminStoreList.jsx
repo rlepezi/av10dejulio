@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { collection, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
 import EmpresaMap from "./EmpresaMap";
 import CrearEmpresaPublica from "./CrearEmpresaPublica";
+import { ESTADOS_EMPRESA, puedeTransicionar } from '../utils/empresaStandards';
 
 function AdminStoreList() {
   const [empresas, setEmpresas] = useState([]);
@@ -68,7 +69,14 @@ function AdminStoreList() {
 
   const toggleEstado = async (empresa) => {
     try {
-      const nuevoEstado = empresa.estado === 'Activa' ? 'Inactiva' : 'Activa';
+      const nuevoEstado = empresa.estado === ESTADOS_EMPRESA.ACTIVA ? ESTADOS_EMPRESA.INACTIVA : ESTADOS_EMPRESA.ACTIVA;
+      
+      // Validar transición permitida
+      if (!puedeTransicionar(empresa.estado, nuevoEstado)) {
+        alert(`No se puede cambiar de "${empresa.estado}" a "${nuevoEstado}"`);
+        return;
+      }
+      
       await updateDoc(doc(db, "empresas", empresa.id), {
         estado: nuevoEstado,
         fecha_actualizacion: new Date()
@@ -121,13 +129,13 @@ function AdminStoreList() {
         </div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-green-800">
-            {empresas.filter(e => e.estado === 'Activa').length}
+            {empresas.filter(e => e.estado === ESTADOS_EMPRESA.ACTIVA).length}
           </div>
           <div className="text-green-600 text-sm">Empresas Activas</div>
         </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-red-800">
-            {empresas.filter(e => e.estado === 'Inactiva').length}
+            {empresas.filter(e => e.estado === ESTADOS_EMPRESA.INACTIVA).length}
           </div>
           <div className="text-red-600 text-sm">Empresas Inactivas</div>
         </div>
@@ -156,8 +164,14 @@ function AdminStoreList() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos los estados</option>
-              <option value="Activa">Activa</option>
-              <option value="Inactiva">Inactiva</option>
+              <option value={ESTADOS_EMPRESA.CATALOGADA}>Catalogada</option>
+              <option value={ESTADOS_EMPRESA.PENDIENTE_VALIDACION}>Pendiente de Validación</option>
+              <option value={ESTADOS_EMPRESA.EN_VISITA}>En Visita</option>
+              <option value={ESTADOS_EMPRESA.VALIDADA}>Validada</option>
+              <option value={ESTADOS_EMPRESA.ACTIVA}>Activa</option>
+              <option value={ESTADOS_EMPRESA.SUSPENDIDA}>Suspendida</option>
+              <option value={ESTADOS_EMPRESA.INACTIVA}>Inactiva</option>
+              <option value={ESTADOS_EMPRESA.RECHAZADA}>Rechazada</option>
             </select>
             <select
               value={filtros.categoria}
@@ -292,9 +306,23 @@ function AdminStoreList() {
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="font-bold text-lg text-gray-900">{emp.nombre}</h3>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        emp.estado === 'Activa' 
+                        emp.estado === ESTADOS_EMPRESA.ACTIVA 
                           ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
+                          : emp.estado === ESTADOS_EMPRESA.VALIDADA
+                          ? 'bg-blue-100 text-blue-800'
+                          : emp.estado === ESTADOS_EMPRESA.PENDIENTE_VALIDACION
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : emp.estado === ESTADOS_EMPRESA.CATALOGADA
+                          ? 'bg-gray-100 text-gray-800'
+                          : emp.estado === ESTADOS_EMPRESA.EN_VISITA
+                          ? 'bg-orange-100 text-orange-800'
+                          : emp.estado === ESTADOS_EMPRESA.SUSPENDIDA
+                          ? 'bg-red-100 text-red-800'
+                          : emp.estado === ESTADOS_EMPRESA.INACTIVA
+                          ? 'bg-gray-100 text-gray-800'
+                          : emp.estado === ESTADOS_EMPRESA.RECHAZADA
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
                       }`}>
                         {emp.estado || 'Sin estado'}
                       </span>
@@ -341,13 +369,13 @@ function AdminStoreList() {
                     </button>
                     <button 
                       className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        emp.estado === 'Activa'
+                        emp.estado === ESTADOS_EMPRESA.ACTIVA
                           ? 'bg-red-100 hover:bg-red-200 text-red-700'
                           : 'bg-green-100 hover:bg-green-200 text-green-700'
                       }`} 
                       onClick={() => toggleEstado(emp)}
                     >
-                      {emp.estado === 'Activa' ? '⏸️ Desactivar' : '▶️ Activar'}
+                      {emp.estado === ESTADOS_EMPRESA.ACTIVA ? '⏸️ Desactivar' : '▶️ Activar'}
                     </button>
                     <button 
                       className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm transition-colors" 
@@ -405,7 +433,7 @@ function AdminStoreList() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        emp.estado === 'Activa' 
+                        emp.estado === 'activa' 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
@@ -420,10 +448,10 @@ function AdminStoreList() {
                         Editar
                       </button>
                       <button 
-                        className={emp.estado === 'Activa' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'} 
+                        className={emp.estado === 'activa' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'} 
                         onClick={() => toggleEstado(emp)}
                       >
-                        {emp.estado === 'Activa' ? 'Desactivar' : 'Activar'}
+                        {emp.estado === 'activa' ? 'Desactivar' : 'Activar'}
                       </button>
                       <button 
                         className="text-red-600 hover:text-red-900" 

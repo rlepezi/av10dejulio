@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { db, storage, auth } from '../firebase';
 import LogoUploader from './LogoUploader';
 import HorarioManager from './HorarioManager';
 import PerfilEmpresaWeb from './PerfilEmpresaWeb';
-import { getDocs, collection } from 'firebase/firestore';
+import { getDocs, collection as getCollection } from 'firebase/firestore';
 
 export default function EditarEmpresaAdmin() {
   // Obtener agentes disponibles
@@ -15,7 +16,7 @@ export default function EditarEmpresaAdmin() {
   useEffect(() => {
     const fetchAgentes = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'agentes'));
+        const snapshot = await getDocs(getCollection(db, 'agentes'));
         setAgentes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error('Error cargando agentes:', error);
@@ -33,6 +34,15 @@ export default function EditarEmpresaAdmin() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
   const [error, setError] = useState('');
+  
+  // Estados para el modal de credenciales
+  const [mostrarModalCredenciales, setMostrarModalCredenciales] = useState(false);
+  const [credencialesForm, setCredencialesForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [credencialesGeneradasInfo, setCredencialesGeneradasInfo] = useState(null);
 
   useEffect(() => {
     fetchEmpresa();
@@ -45,9 +55,17 @@ export default function EditarEmpresaAdmin() {
       
       if (docSnap.exists()) {
         const data = docSnap.data();
+        console.log('📊 Datos de empresa cargados:', data);
+        console.log('🕐 Horario de atención:', data.horario_atencion);
+        console.log('🕐 Horarios:', data.horarios);
         setEmpresa({ id: docSnap.id, ...data });
         setCredencialesGeneradas(!!data.credencialesGeneradas);
         setSolicitudPendiente(data.estado === 'pendiente_validación');
+        
+        // Si ya tiene credenciales, cargar la información
+        if (data.credencialesGeneradas && data.usuario_empresa) {
+          setCredencialesGeneradasInfo(data.usuario_empresa);
+        }
       } else {
         setError('Empresa no encontrada');
       }
@@ -62,17 +80,43 @@ export default function EditarEmpresaAdmin() {
   const handleUpdateEmpresa = async (campo, valor) => {
     try {
       setSaving(true);
-      const updateObj = {
-        [campo]: valor,
-        fecha_actualizacion: new Date()
-      };
-      // Si se valida la empresa, se pueden generar credenciales
-      if (campo === 'estado' && valor === 'validada') {
-        updateObj.credencialesGeneradas = false;
-      }
-      await updateDoc(doc(db, 'empresas', empresaId), updateObj);
       
-      setEmpresa(prev => ({ ...prev, [campo]: valor }));
+      // Si es una actualización múltiple
+      if (campo === 'multiple' && typeof valor === 'object') {
+        const updateObj = {
+          ...valor,
+          fecha_actualizacion: new Date()
+        };
+        
+        // Si se valida la empresa, se pueden generar credenciales
+        if (valor.estado === 'validada') {
+          updateObj.credencialesGeneradas = false;
+        }
+        
+        await updateDoc(doc(db, 'empresas', empresaId), updateObj);
+        
+        // Actualizar estado local con todos los cambios
+        setEmpresa(prev => ({ ...prev, ...valor }));
+        
+        console.log('✅ Cambios múltiples guardados exitosamente');
+      } else {
+        // Actualización de un solo campo (comportamiento original)
+        const updateObj = {
+          [campo]: valor,
+          fecha_actualizacion: new Date()
+        };
+        
+        // Si se valida la empresa, se pueden generar credenciales
+        if (campo === 'estado' && valor === 'validada') {
+          updateObj.credencialesGeneradas = false;
+        }
+        
+        await updateDoc(doc(db, 'empresas', empresaId), updateObj);
+        
+        setEmpresa(prev => ({ ...prev, [campo]: valor }));
+        
+        console.log(`✅ Campo '${campo}' actualizado exitosamente`);
+      }
       
       // Mostrar mensaje de éxito temporal
       setTimeout(() => setSaving(false), 1000);
@@ -97,18 +141,200 @@ export default function EditarEmpresaAdmin() {
         setSaving(false);
         return;
       }
-      // ...existing code...
+
+      if (file === null) {
+        // Eliminar logo
+        await updateDoc(doc(db, 'empresas', empresaId), {
+          logo: null,
+          logo_url: null,
+          fecha_actualizacion: new Date()
+        });
+        setEmpresa(prev => ({ ...prev, logo: null, logo_url: null }));
+        setSaving(false);
+        return;
+      }
+
+      if (typeof file === 'object' && file.logoURL) {
+        // Logo automático generado
+        await updateDoc(doc(db, 'empresas', empresaId), {
+          logo: file.logoURL,
+          logo_url: file.logoURL,
+          logoAsignado: true,
+          fecha_actualizacion: new Date()
+        });
+        setEmpresa(prev => ({ 
+          ...prev, 
+          logo: file.logoURL, 
+          logo_url: file.logoURL,
+          logoAsignado: true 
+        }));
+        setSaving(false);
+        return;
+      }
+
+      // Subir nuevo logo
+      if (file instanceof File) {
+        // Crear nombre único para el archivo
+        const timestamp = Date.now();
+        const fileName = `logo-${empresaId}-${timestamp}.${file.name.split('.').pop()}`;
+        const logoRef = ref(storage, `logos/empresas/${fileName}`);
+        
+        // Subir archivo
+        const snapshot = await uploadBytes(logoRef, file);
+        
+        // Obtener URLs
+        const gsUrl = `gs://${storage.app.options.storageBucket}/${snapshot.ref.fullPath}`;
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        // Actualizar en Firestore
+        await updateDoc(doc(db, 'empresas', empresaId), {
+          logo: gsUrl,
+          logo_url: downloadURL,
+          logoAsignado: true,
+          fecha_actualizacion: new Date()
+        });
+        
+        // Actualizar estado local
+        setEmpresa(prev => ({ 
+          ...prev, 
+          logo: gsUrl, 
+          logo_url: downloadURL,
+          logoAsignado: true 
+        }));
+        
+        console.log('✅ Logo subido exitosamente:', { gsUrl, downloadURL });
+        setSaving(false);
+        return downloadURL;
+      }
+      
     } catch (error) {
       console.error('Error subiendo logo:', error);
+      setError('Error al subir el logo');
       throw error;
     } finally {
       setSaving(false);
     }
   };
 
-  // ...existing code...
+  // Generar credenciales (solo si validada)
+  const handleGenerarCredenciales = async () => {
+    // Pre-llenar el email con el de la empresa si existe
+    const emailEmpresa = empresa.email || empresa.representante?.email || '';
+    setCredencialesForm({
+      email: emailEmpresa,
+      password: '',
+      confirmPassword: ''
+    });
+    setMostrarModalCredenciales(true);
+  };
 
-  // ...restaurar aquí el return original y la estructura anterior...
+  // Generar contraseña aleatoria
+  const generarPasswordAleatoria = () => {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    setCredencialesForm(prev => ({
+      ...prev,
+      password: password,
+      confirmPassword: password
+    }));
+  };
+
+  // Crear credenciales reales para la empresa
+  const crearCredencialesEmpresa = async () => {
+    if (!credencialesForm.email || !credencialesForm.password) {
+      alert('Debes completar email y contraseña');
+      return;
+    }
+
+    if (credencialesForm.password !== credencialesForm.confirmPassword) {
+      alert('Las contraseñas no coinciden');
+      return;
+    }
+
+    if (credencialesForm.password.length < 6) {
+      alert('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    setGenerandoCredenciales(true);
+    try {
+      // 1. Crear usuario en Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        credencialesForm.email, 
+        credencialesForm.password
+      );
+
+      const nuevoUid = userCredential.user.uid;
+
+      // 2. Crear registro en la colección 'usuarios' usando setDoc con el UID correcto
+      await setDoc(doc(db, 'usuarios', nuevoUid), {
+        uid: nuevoUid,
+        email: credencialesForm.email,
+        nombre: empresa.nombre,
+        rol: 'proveedor',
+        empresaId: empresaId,
+        activo: true,
+        fechaCreacion: new Date(),
+        creadoPorAdmin: true,
+        empresa: {
+          nombre: empresa.nombre,
+          id: empresaId,
+          estado: empresa.estado
+        }
+      });
+
+      // 3. Actualizar la empresa con las credenciales
+      await updateDoc(doc(db, 'empresas', empresaId), {
+        credencialesGeneradas: true,
+        fecha_credenciales: new Date(),
+        usuario_empresa: {
+          email: credencialesForm.email,
+          uid: nuevoUid,
+          fecha_asignacion: new Date(),
+          admin_asignador: 'admin' // O el email del admin actual
+        },
+        uid_auth: nuevoUid
+      });
+
+      // 4. Actualizar estado local
+      setCredencialesGeneradas(true);
+      setCredencialesGeneradasInfo({
+        email: credencialesForm.email,
+        uid: nuevoUid,
+        fecha_asignacion: new Date(),
+        admin_asignador: 'admin'
+      });
+
+      // 5. Cerrar modal y mostrar éxito
+      setMostrarModalCredenciales(false);
+      setCredencialesForm({ email: '', password: '', confirmPassword: '' });
+      
+      // Mostrar información de las credenciales creadas
+      alert(
+        `✅ Credenciales creadas exitosamente!\n\n` +
+        `📧 Email: ${credencialesForm.email}\n` +
+        `🔑 Contraseña: ${credencialesForm.password}\n\n` +
+        `📋 IMPORTANTE:\n` +
+        `• Envía estas credenciales a la empresa\n` +
+        `• La empresa puede hacer login inmediatamente\n` +
+        `• Accederá a su panel de empresa`
+      );
+
+    } catch (error) {
+      console.error('Error creando credenciales:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        alert('❌ Error: El email ya está en uso por otro usuario. Usa un email diferente.');
+      } else {
+        alert(`❌ Error creando credenciales: ${error.message}`);
+      }
+    } finally {
+      setGenerandoCredenciales(false);
+    }
+  };
 
   if (error) {
     return (
@@ -150,16 +376,6 @@ export default function EditarEmpresaAdmin() {
     await handleUpdateEmpresa('estado', 'validada');
   };
 
-  // Generar credenciales (solo si validada)
-  const handleGenerarCredenciales = async () => {
-    setGenerandoCredenciales(true);
-    await updateDoc(doc(db, 'empresas', empresaId), {
-      credencialesGeneradas: true,
-      fecha_credenciales: new Date()
-    });
-    setCredencialesGeneradas(true);
-    setGenerandoCredenciales(false);
-  };
   const tabs = [
     { id: 'general', label: 'Información General', icon: '📋' },
     { id: 'representante', label: 'Representante', icon: '👤' },
@@ -207,11 +423,27 @@ export default function EditarEmpresaAdmin() {
               )}
               {puedeGenerarCredenciales && (
                 <button onClick={handleGenerarCredenciales} disabled={generandoCredenciales} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 mt-2">
-                  {generandoCredenciales ? 'Generando credenciales...' : 'Generar credenciales y acceso'}
+                  {generandoCredenciales ? 'Generando credenciales...' : '🔑 Crear credenciales de login'}
                 </button>
               )}
-              {credencialesGeneradas && (
-                <span className="px-3 py-1 rounded-full text-sm font-semibold bg-indigo-100 text-indigo-800 mt-2">Credenciales generadas: acceso total</span>
+              {credencialesGeneradas && credencialesGeneradasInfo && (
+                <div className="mt-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-indigo-800 mb-2">
+                    <span className="text-lg">✅</span>
+                    <span className="font-semibold">Credenciales creadas</span>
+                  </div>
+                  <div className="text-sm text-indigo-700">
+                    <p><strong>Email:</strong> {credencialesGeneradasInfo.email}</p>
+                    <p><strong>Fecha:</strong> {credencialesGeneradasInfo.fecha_asignacion?.toDate?.()?.toLocaleDateString() || 'N/A'}</p>
+                    <p><strong>UID:</strong> {credencialesGeneradasInfo.uid}</p>
+                  </div>
+                  <button 
+                    onClick={() => setMostrarModalCredenciales(true)}
+                    className="mt-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"
+                  >
+                    🔄 Cambiar credenciales
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -360,8 +592,116 @@ export default function EditarEmpresaAdmin() {
           />
         )}
       </div>
+
+      {/* Modal para crear credenciales */}
+      {mostrarModalCredenciales && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800">🔑 Crear Credenciales de Login</h2>
+              <button
+                onClick={() => setMostrarModalCredenciales(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email de acceso *
+                </label>
+                <input
+                  type="email"
+                  value={credencialesForm.email}
+                  onChange={(e) => setCredencialesForm(prev => ({...prev, email: e.target.value}))}
+                  placeholder="email@empresa.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Recomendado: usar el email del representante legal
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contraseña *
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={credencialesForm.password}
+                    onChange={(e) => setCredencialesForm(prev => ({...prev, password: e.target.value}))}
+                    placeholder="Contraseña"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={generarPasswordAleatoria}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                  >
+                    🎲 Generar
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Mínimo 6 caracteres. Usa el botón "Generar" para crear una contraseña segura.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar contraseña *
+                </label>
+                <input
+                  type="text"
+                  value={credencialesForm.confirmPassword}
+                  onChange={(e) => setCredencialesForm(prev => ({...prev, confirmPassword: e.target.value}))}
+                  placeholder="Repite la contraseña"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Información importante */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 text-lg">ℹ️</span>
+                  <div className="text-sm text-blue-800">
+                    <p className="font-semibold mb-1">Importante:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Se creará un usuario real en el sistema</li>
+                      <li>La empresa podrá hacer login inmediatamente</li>
+                      <li>Accederá a su panel de empresa</li>
+                      <li>Guarda estas credenciales de forma segura</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Botones */}
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => setMostrarModalCredenciales(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={crearCredencialesEmpresa}
+                disabled={generandoCredenciales}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {generandoCredenciales ? '⏳ Creando...' : '✅ Crear Credenciales'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
 
 // Componente para asignación de agente
 function AgenteAsignacion({ empresa, agentes, onUpdate, saving }) {
@@ -384,7 +724,6 @@ function AgenteAsignacion({ empresa, agentes, onUpdate, saving }) {
     </div>
   );
 }
-}
 
 // Componente para información general
 function InformacionGeneral({ empresa, onUpdate, saving }) {
@@ -396,21 +735,61 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
     web: empresa.web || '',
     categoria: empresa.categoria || '',
     descripcion: empresa.descripcion || '',
-    estado: empresa.estado || 'Inactiva',
+            estado: empresa.estado || 'inactiva',
     tipoEmpresa: empresa.tipoEmpresa || 'proveedor'
   });
+  const [mensajeExito, setMensajeExito] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    Object.keys(formData).forEach(key => {
-      if (formData[key] !== empresa[key]) {
-        onUpdate(key, formData[key]);
-      }
+  // Sincronizar formData cuando cambie la empresa
+  useEffect(() => {
+    setFormData({
+      nombre: empresa.nombre || '',
+      email: empresa.email || '',
+      telefono: empresa.telefono || '',
+      direccion: empresa.direccion || '',
+      web: empresa.web || '',
+      categoria: empresa.categoria || '',
+      descripcion: empresa.descripcion || '',
+      estado: empresa.estado || 'inactiva',
+      tipoEmpresa: empresa.tipoEmpresa || 'proveedor'
     });
+  }, [empresa]);
+
+  const handleSave = async () => {
+    try {
+      // Filtrar solo los campos que han cambiado
+      const cambios = {};
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== empresa[key]) {
+          cambios[key] = formData[key];
+        }
+      });
+
+      // Si no hay cambios, no hacer nada
+      if (Object.keys(cambios).length === 0) {
+        console.log('No hay cambios para guardar');
+        return;
+      }
+
+      console.log('Guardando cambios:', cambios);
+      
+      // Guardar todos los cambios en una sola operación
+      await onUpdate('multiple', cambios);
+      
+      // Mostrar mensaje de éxito
+      setMensajeExito('✅ Cambios guardados exitosamente');
+      setTimeout(() => setMensajeExito(''), 3000);
+      
+    } catch (error) {
+      console.error('Error al guardar cambios:', error);
+      setMensajeExito('❌ Error al guardar los cambios');
+      setTimeout(() => setMensajeExito(''), 3000);
+    }
   };
 
   return (
@@ -434,7 +813,7 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Email *
+            Email
           </label>
           <input
             type="email"
@@ -442,7 +821,7 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
             value={formData.email}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
+            placeholder="email@empresa.com"
           />
         </div>
 
@@ -503,11 +882,27 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="Activa">Activa</option>
-            <option value="Inactiva">Inactiva</option>
-            <option value="En Revisión">En Revisión</option>
-            <option value="Suspendida">Suspendida</option>
+            <option value="activa">Activa</option>
+            <option value="inactiva">Inactiva</option>
+            <option value="en_revision">En Revisión</option>
+            <option value="suspendida">Suspendida</option>
           </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Horario de Atención Actual
+          </label>
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            {empresa.horario_atencion ? (
+              <p className="text-gray-800 font-medium">{empresa.horario_atencion}</p>
+            ) : (
+              <p className="text-gray-500 italic">No hay horarios configurados</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Para modificar horarios, ve a la pestaña "Horarios"
+            </p>
+          </div>
         </div>
 
         <div>
@@ -556,6 +951,17 @@ function InformacionGeneral({ empresa, onUpdate, saving }) {
           placeholder="Descripción de la empresa y sus servicios..."
         />
       </div>
+
+      {/* Mensaje de éxito/error */}
+      {mensajeExito && (
+        <div className={`mt-4 p-3 rounded-lg text-sm ${
+          mensajeExito.includes('✅') 
+            ? 'bg-green-100 text-green-800 border border-green-200' 
+            : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {mensajeExito}
+        </div>
+      )}
 
       <div className="mt-6 flex justify-end">
         <button
@@ -696,8 +1102,10 @@ function InformacionRepresentante({ empresa, onUpdate, saving }) {
 function ServiciosManager({ empresa, onUpdate, saving }) {
   const [servicios, setServicios] = useState(empresa.servicios || []);
   const [marcas, setMarcas] = useState(empresa.marcas || []);
+  const [categorias, setCategorias] = useState(empresa.categorias || []);
   const [nuevoServicio, setNuevoServicio] = useState('');
   const [nuevaMarca, setNuevaMarca] = useState('');
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [activeSection, setActiveSection] = useState('servicios');
 
   // Servicios predefinidos comunes
@@ -713,6 +1121,12 @@ function ServiciosManager({ empresa, onUpdate, saving }) {
     'Toyota', 'Chevrolet', 'Ford', 'Nissan', 'Hyundai', 'Kia', 'Mazda',
     'Honda', 'Volkswagen', 'Renault', 'Peugeot', 'Citroën', 'Fiat',
     'BMW', 'Mercedes-Benz', 'Audi', 'Volvo', 'Jeep', 'Mitsubishi', 'Subaru'
+  ];
+
+  // Categorías predefinidas (tipos de vehículos)
+  const categoriasPredefinidas = [
+    'Auto', 'Camioneta', 'Camión', 'Bus', 'Moto', 'Pickup', 'SUV', 'Van',
+    'Camión de Carga', 'Tractor', 'Maquinaria Pesada', 'Bicicleta'
   ];
 
   const agregarServicio = (servicio = null) => {
@@ -735,6 +1149,16 @@ function ServiciosManager({ empresa, onUpdate, saving }) {
     }
   };
 
+  const agregarCategoria = (categoria = null) => {
+    const categoriaAgregar = categoria || nuevaCategoria.trim();
+    if (categoriaAgregar && !categorias.includes(categoriaAgregar)) {
+      const nuevasCategorias = [...categorias, categoriaAgregar];
+      setCategorias(nuevasCategorias);
+      setNuevaCategoria('');
+      onUpdate('categorias', nuevasCategorias);
+    }
+  };
+
   const eliminarServicio = (index) => {
     const nuevosServicios = servicios.filter((_, i) => i !== index);
     setServicios(nuevosServicios);
@@ -747,20 +1171,28 @@ function ServiciosManager({ empresa, onUpdate, saving }) {
     onUpdate('marcas', nuevasMarcas);
   };
 
+  const eliminarCategoria = (index) => {
+    const nuevasCategorias = categorias.filter((_, i) => i !== index);
+    setCategorias(nuevasCategorias);
+    onUpdate('categorias', nuevasCategorias);
+  };
+
   const handleKeyPress = (e, tipo) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (tipo === 'servicio') {
         agregarServicio();
-      } else {
+      } else if (tipo === 'marca') {
         agregarMarca();
+      } else if (tipo === 'categoria') {
+        agregarCategoria();
       }
     }
   };
 
   return (
     <div className="p-6">
-      <h3 className="text-lg font-semibold mb-4">Servicios y Marcas</h3>
+      <h3 className="text-lg font-semibold mb-4">Servicios, Marcas y Categorías</h3>
       
       {/* Navegación de secciones */}
       <div className="mb-6">
@@ -784,6 +1216,16 @@ function ServiciosManager({ empresa, onUpdate, saving }) {
             }`}
           >
             🚗 Marcas ({marcas.length})
+          </button>
+          <button
+            onClick={() => setActiveSection('categorias')}
+            className={`px-4 py-2 font-medium ${
+              activeSection === 'categorias'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🚙 Categorías ({categorias.length})
           </button>
         </div>
       </div>
@@ -927,6 +1369,76 @@ function ServiciosManager({ empresa, onUpdate, saving }) {
           </div>
         </div>
       )}
+
+      {/* Sección de Categorías */}
+      {activeSection === 'categorias' && (
+        <div>
+          {/* Categorías predefinidas */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold mb-3">Tipos de Vehículos Comunes</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {categoriasPredefinidas
+                .filter(categoria => !categorias.includes(categoria))
+                .map((categoria, index) => (
+                <button
+                  key={index}
+                  onClick={() => agregarCategoria(categoria)}
+                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-purple-100 hover:text-purple-700 transition-colors text-left"
+                >
+                  + {categoria}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Agregar categoría personalizada */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold mb-3">Agregar Tipo de Vehículo Personalizado</h4>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={nuevaCategoria}
+                onChange={(e) => setNuevaCategoria(e.target.value)}
+                onKeyPress={(e) => handleKeyPress(e, 'categoria')}
+                placeholder="Nombre del tipo de vehículo personalizado..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                onClick={() => agregarCategoria()}
+                disabled={!nuevaCategoria.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                Agregar
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de categorías seleccionadas */}
+          <div>
+            <h4 className="text-md font-semibold mb-3">Tipos de Vehículos Seleccionados</h4>
+            {categorias.length === 0 ? (
+              <p className="text-gray-500 text-center py-6 bg-gray-50 rounded-lg">
+                No hay tipos de vehículos seleccionados
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {categorias.map((categoria, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <span className="flex-1 text-purple-800">🚙 {categoria}</span>
+                    <button
+                      onClick={() => eliminarCategoria(index)}
+                      className="text-red-600 hover:text-red-800 p-1 ml-2"
+                      title="Eliminar tipo de vehículo"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -940,6 +1452,7 @@ function RevisionAdmin({ empresa, onUpdate, saving }) {
     imagenesMinimas: empresa.galeria && empresa.galeria.length >= 2,
     serviciosCompletos: empresa.servicios && empresa.servicios.length >= 2,
     marcasDefinidas: empresa.marcas && empresa.marcas.length >= 2,
+    categoriasDefinidas: empresa.categorias && empresa.categorias.length >= 2,
     horariosCompletos: empresa.horarios && Object.values(empresa.horarios).some(h => h.abierto),
     informacionCompleta: empresa.nombre && empresa.telefono && empresa.email && empresa.direccion,
     representanteCompleto: empresa.representante && empresa.representante.nombre && empresa.representante.email
@@ -1070,6 +1583,21 @@ function RevisionAdmin({ empresa, onUpdate, saving }) {
           )}
         </div>
 
+        <div className={`p-4 rounded-lg border-l-4 ${validaciones.categoriasDefinidas ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h5 className="font-medium">🚙 Tipos de Vehículos</h5>
+              <p className="text-sm text-gray-600">Mínimo 2 tipos definidos</p>
+            </div>
+            <span className="text-2xl">{validaciones.categoriasDefinidas ? '✅' : '❌'}</span>
+          </div>
+          {!validaciones.categoriasDefinidas && (
+            <p className="text-red-600 text-sm mt-2">
+              ⚠️ Definir tipos de vehículos ({empresa.categorias?.length || 0}/2 mínimo)
+            </p>
+          )}
+        </div>
+
         <div className={`p-4 rounded-lg border-l-4 ${validaciones.horariosCompletos ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -1146,7 +1674,7 @@ function RevisionAdmin({ empresa, onUpdate, saving }) {
                 <button
                   onClick={() => {
                     handleValidarElement('perfilPublico', true);
-                    handleValidarElement('estado', 'Activa');
+                    handleValidarElement('estado', 'activa');
                   }}
                   disabled={saving}
                   className="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
@@ -1475,7 +2003,16 @@ function HorarioManagerDetallado({ empresa, onUpdate, saving }) {
   };
 
   const [horarios, setHorarios] = useState(() => {
-    const horariosEmpresa = empresa.horarios || {};
+    // Buscar horarios en diferentes campos para compatibilidad
+    let horariosEmpresa = empresa.horarios || {};
+    
+    // Si no hay horarios estructurados pero hay horario_atencion, intentar parsearlo
+    if (Object.keys(horariosEmpresa).length === 0 && empresa.horario_atencion) {
+      console.log('📝 Horario de atención encontrado:', empresa.horario_atencion);
+      // Intentar convertir el texto de horarios a estructura
+      horariosEmpresa = parsearHorarioTexto(empresa.horario_atencion);
+    }
+    
     const horariosCompletos = {};
     
     diasSemana.forEach(dia => {
@@ -1489,6 +2026,78 @@ function HorarioManagerDetallado({ empresa, onUpdate, saving }) {
   });
 
   const [configuracionRapida, setConfiguracionRapida] = useState('personalizado');
+
+  // Función para parsear texto de horarios a estructura
+  const parsearHorarioTexto = (textoHorarios) => {
+    if (!textoHorarios) return {};
+    
+    console.log('🔄 Parseando horarios del texto:', textoHorarios);
+    
+    const horariosParseados = {};
+    const diasSemana = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+    
+    // Mapeo de abreviaciones a claves
+    const mapeoDias = {
+      'lun': 'lunes',
+      'mar': 'martes', 
+      'mié': 'miercoles',
+      'jue': 'jueves',
+      'vie': 'viernes',
+      'sáb': 'sabado',
+      'dom': 'domingo'
+    };
+    
+    // Dividir por comas y procesar cada día
+    const partes = textoHorarios.split(',').map(p => p.trim());
+    
+    partes.forEach(parte => {
+      // Buscar el día en la parte
+      let diaEncontrado = null;
+      let horarioEncontrado = null;
+      
+      // Buscar abreviación de día
+      for (const [abrev, dia] of Object.entries(mapeoDias)) {
+        if (parte.toLowerCase().includes(abrev.toLowerCase())) {
+          diaEncontrado = dia;
+          break;
+        }
+      }
+      
+      if (diaEncontrado) {
+        // Extraer horario (formato: HH:MM-HH:MM)
+        const matchHorario = parte.match(/(\d{1,2}:\d{2})-(\d{1,2}:\d{2})/);
+        if (matchHorario) {
+          const [_, inicio, fin] = matchHorario;
+          horariosParseados[diaEncontrado] = {
+            abierto: true,
+            apertura: inicio,
+            cierre: fin,
+            turno_continuo: true,
+            descanso_inicio: '',
+            descanso_fin: ''
+          };
+          console.log(`✅ Día ${diaEncontrado}: ${inicio}-${fin}`);
+        }
+      }
+    });
+    
+    // Completar días no encontrados como cerrados
+    diasSemana.forEach(dia => {
+      if (!horariosParseados[dia]) {
+        horariosParseados[dia] = {
+          abierto: false,
+          apertura: '09:00',
+          cierre: '18:00',
+          turno_continuo: true,
+          descanso_inicio: '',
+          descanso_fin: ''
+        };
+      }
+    });
+    
+    console.log('📊 Horarios parseados:', horariosParseados);
+    return horariosParseados;
+  };
 
   const handleDiaChange = (dia, campo, valor) => {
     const nuevosHorarios = {

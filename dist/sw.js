@@ -4,9 +4,9 @@
 const CACHE_NAME = 'av10-de-julio-v1';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json'
+  '/manifest.json',
+  '/logo192.png',
+  '/favicon.ico'
 ];
 
 // Instalación del Service Worker

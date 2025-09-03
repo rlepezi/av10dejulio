@@ -31,7 +31,7 @@ export const USER_ROLES = {
 
 export const ESTADOS = {
   ACTIVO: 'activo',
-  ACTIVA: 'Activa',
+  ACTIVA: 'activa',
   INACTIVO: 'inactivo',
   PENDIENTE: 'pendiente',
   APROBADO: 'aprobado',

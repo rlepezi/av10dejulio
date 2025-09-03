@@ -218,11 +218,14 @@ const ProductCard = ({
         {showProviderInfo && product.empresa && (
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
             <div className="flex items-center space-x-2">
-              {product.empresa.logo && (
+              {(product.empresa.logo_url || product.empresa.logo) && (
                 <img
-                  src={product.empresa.logo}
+                  src={product.empresa.logo_url || product.empresa.logo}
                   alt={product.empresa.nombre}
                   className="w-6 h-6 rounded-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
                 />
               )}
               <span className="text-sm text-gray-600 truncate">

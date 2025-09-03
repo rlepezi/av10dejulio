@@ -101,7 +101,7 @@ const CatastroMasivo = () => {
             // Campos del catastro AV10 de Julio
             zona: 'AV10_JULIO',
             calles: determinarCalles(row.data.direccion),
-            estado: 'Enviada', // Estado inicial del catastro
+            estado: 'catalogada', // Estado inicial del catastro (nuevo sistema)
             origen: 'catastro_masivo',
             fechaCreacion: serverTimestamp(),
             fechaActualizacion: serverTimestamp(),

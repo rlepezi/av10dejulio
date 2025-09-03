@@ -35,23 +35,21 @@ const linksAdmin = [
   { to: "recursos-educativos", label: "� Recursos Educativos", icon: "�", section: "admin" },
   { to: "configuracion-sistema", label: "⚙️ Configuración Sistema", icon: "⚙️", section: "admin" },
   
-  // Catastro
-  { to: "catastro-masivo", label: "📊 Catastro Masivo", icon: "📊", section: "catastro" },
-  { to: "panel-validacion", label: "🔍 Panel de Validación", icon: "🔍", section: "catastro" },
-  { to: "agentes-campo", label: "👥 Agentes de Campo", icon: "👥", section: "catastro" },
-  { to: "gestion-agentes", label: "🔑 Gestión de Agentes", icon: "🔑", section: "catastro" },
+  // Gestión de Empresas
+  { to: "crear-empresa-publica", label: "➕ Crear Empresa Pública", icon: "➕", section: "empresas" },
+  { to: "panel-validacion", label: "🔍 Panel de Validación", icon: "🔍", section: "empresas" },
+  { to: "gestion-agentes", label: "👥 Gestión de Agentes", icon: "👥", section: "empresas" },
 ];
 
-const linksProveedor = [
-  { to: "/proveedor", label: "Panel", icon: "📊" },
-  { to: "/proveedor/mi-empresa", label: "Mi Empresa", icon: "🏢" },
-  { to: "/proveedor/solicitar-campana", label: "Solicitar Campaña", icon: "📢" },
-  { to: "/proveedor/solicitar-producto", label: "Solicitar Producto", icon: "📦" }
+const linksEmpresa = [
+  { to: "/empresa", label: "Panel", icon: "📊" },
+  { to: "/empresa/mi-empresa", label: "Mi Empresa", icon: "🏢" },
+  { to: "/empresa/solicitar-campana", label: "Solicitar Campaña", icon: "📢" },
+  { to: "/empresa/solicitar-producto", label: "Solicitar Producto", icon: "📦" }
 ];
 
 const linksAgente = [
   { to: "/dashboard/agente", label: "Mi Dashboard", icon: "🗂" },
-  { to: "/agente/empresas-asignadas", label: "Empresas Asignadas", icon: "🏢" },
   { to: "/agente/nueva-empresa", label: "Registrar Empresa Validada", icon: "✅" }
 ];
 
@@ -63,12 +61,12 @@ export default function Sidebar({ rol }) {
   let links;
   if (rol === "admin") {
     links = linksAdmin;
-  } else if (rol === "proveedor") {
-    links = linksProveedor;
+      } else if (rol === "proveedor") {
+    links = linksEmpresa;
   } else if (rol === "agente") {
     links = linksAgente;
   } else {
-    links = linksProveedor;
+    links = linksEmpresa;
   }
   
   // Determinar si estamos en el contexto de admin
@@ -91,7 +89,7 @@ export default function Sidebar({ rol }) {
     main: "PANEL PRINCIPAL",
     servicios: "SERVICIOS",
     admin: "ADMINISTRACIÓN",
-    catastro: "CATASTRO"
+    empresas: "GESTIÓN DE EMPRESAS"
   };
 
   const toggleSidebar = () => {

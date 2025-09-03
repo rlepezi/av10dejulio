@@ -2,22 +2,163 @@
 // Archivo: src/utils/empresaStandards.js
 
 // ========================================
-// ESTADOS ESTÁNDAR
+// ESTADOS ESTÁNDAR UNIFICADOS
 // ========================================
 
-export const ESTADOS_SOLICITUD = {
-  PENDIENTE: 'pendiente',
-  EN_REVISION: 'en_revision',
-  ACTIVADA: 'activada',                    // Primera etapa - Visible en home
-  CREDENCIALES_ASIGNADAS: 'credenciales_asignadas', // Segunda etapa - Acceso completo
-  RECHAZADA: 'rechazada'
+export const ESTADOS_EMPRESA = {
+  // ESTADOS INICIALES (Catastro masivo)
+  CATALOGADA: 'catalogada',           // Empresa del catastro inicial (200+ empresas)
+  INGRESADA: 'ingresada',             // Empresa ingresada manualmente por admin
+  PENDIENTE_VALIDACION: 'pendiente_validacion', // Asignada a agente para validación
+  
+  // ESTADOS DE VALIDACIÓN
+  EN_VISITA: 'en_visita',             // Agente programó visita
+  VALIDADA: 'validada',               // Agente validó en terreno
+  RECHAZADA: 'rechazada',             // No cumple requisitos
+  
+  // ESTADOS OPERATIVOS
+  ACTIVA: 'activa',                   // Visible en home y operativa
+  SUSPENDIDA: 'suspendida',           // Temporalmente desactivada
+  INACTIVA: 'inactiva'                // Permanentemente desactivada
 };
 
-export const ESTADOS_EMPRESA = {
-  ACTIVA: 'activa',           // Visible y operativa
-  INACTIVA: 'inactiva',       // Temporalmente desactivada  
-  SUSPENDIDA: 'suspendida',   // Suspendida por admin
-  RECHAZADA: 'rechazada'      // Permanentemente rechazada
+export const ESTADOS_SOLICITUD = {
+  PENDIENTE: 'pendiente',             // Solicitud nueva de proveedor
+  EN_REVISION: 'en_revision',         // Bajo revisión administrativa
+  APROBADA: 'aprobada',               // Aprobada para validación por agente
+  RECHAZADA: 'rechazada'              // Rechazada administrativamente
+};
+
+// ========================================
+// FLUJO DE VIDA COMPLETO DE EMPRESA
+// ========================================
+
+export const FLUJO_EMPRESA = {
+  // FLUJO 1: CATÁSTRO INICIAL (Admin)
+  CATALOGADA: {
+    descripcion: 'Empresa del catastro inicial (200+ empresas)',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Asignar a agente para validación',
+    transiciones: ['pendiente_validacion']
+  },
+  
+  // FLUJO 1.5: EMPRESAS INGRESADAS MANUALMENTE (Admin)
+  INGRESADA: {
+    descripcion: 'Empresa ingresada manualmente por administrador',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Admin puede activar directamente o asignar a agente',
+    transiciones: ['activa', 'pendiente_validacion', 'rechazada']
+  },
+  
+  // FLUJO 2: VALIDACIÓN POR AGENTE
+  PENDIENTE_VALIDACION: {
+    descripcion: 'Asignada a agente para validación en terreno',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Agente programa visita',
+    transiciones: ['en_visita', 'rechazada']
+  },
+  
+  EN_VISITA: {
+    descripcion: 'Agente programó visita de validación',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Agente valida en terreno',
+    transiciones: ['validada', 'rechazada']
+  },
+  
+  VALIDADA: {
+    descripcion: 'Agente validó empresa en terreno',
+    visible_en_home: true,
+    puede_gestionar: false,
+    proximo_paso: 'Admin activa completamente',
+    transiciones: ['activa', 'rechazada']
+  },
+  
+  // FLUJO 3: OPERACIÓN
+  ACTIVA: {
+    descripcion: 'Empresa visible y operativa en el sistema',
+    visible_en_home: true,
+    puede_gestionar: true,
+    proximo_paso: 'Operación normal',
+    transiciones: ['suspendida', 'inactiva']
+  },
+  
+  SUSPENDIDA: {
+    descripcion: 'Temporalmente desactivada por admin',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Reactivar o desactivar permanentemente',
+    transiciones: ['activa', 'inactiva']
+  },
+  
+  INACTIVA: {
+    descripcion: 'Permanentemente desactivada',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Estado final',
+    transiciones: []
+  },
+  
+  RECHAZADA: {
+    descripcion: 'No cumple requisitos de validación',
+    visible_en_home: false,
+    puede_gestionar: false,
+    proximo_paso: 'Estado final',
+    transiciones: []
+  }
+};
+
+// ========================================
+// FLUJO DE SOLICITUDES NUEVAS
+// ========================================
+
+export const FLUJO_SOLICITUD = {
+  PENDIENTE: {
+    descripcion: 'Solicitud nueva de proveedor',
+    proximo_paso: 'Revisión administrativa',
+    transiciones: ['en_revision', 'rechazada']
+  },
+  
+  EN_REVISION: {
+    descripcion: 'Bajo revisión administrativa',
+    proximo_paso: 'Aprobar para validación por agente',
+    transiciones: ['aprobada', 'rechazada']
+  },
+  
+  APROBADA: {
+    descripcion: 'Aprobada para validación por agente',
+    proximo_paso: 'Asignar a agente',
+    transiciones: [] // Se convierte en empresa con estado 'pendiente_validacion'
+  },
+  
+  RECHAZADA: {
+    descripcion: 'Rechazada administrativamente',
+    proximo_paso: 'Estado final',
+    transiciones: []
+  }
+};
+
+// ========================================
+// FUNCIONES DE TRANSICIÓN
+// ========================================
+
+export const puedeTransicionar = (estadoActual, nuevoEstado, esSolicitud = false) => {
+  const flujo = esSolicitud ? FLUJO_SOLICITUD : FLUJO_EMPRESA;
+  const estado = flujo[estadoActual];
+  return estado?.transiciones?.includes(nuevoEstado) || false;
+};
+
+export const obtenerSiguientesEstados = (estadoActual, esSolicitud = false) => {
+  const flujo = esSolicitud ? FLUJO_SOLICITUD : FLUJO_EMPRESA;
+  return flujo[estadoActual]?.transiciones || [];
+};
+
+export const obtenerDescripcionEstado = (estado, esSolicitud = false) => {
+  const flujo = esSolicitud ? FLUJO_SOLICITUD : FLUJO_EMPRESA;
+  return flujo[estado]?.descripcion || 'Estado desconocido';
 };
 
 // ========================================
@@ -58,7 +199,9 @@ export const CAMPOS_FECHA = {
   ACTIVACION: 'fecha_activacion',
   ACTUALIZACION: 'fecha_actualizacion', 
   SUSPENSION: 'fecha_suspension',
-  RECHAZO: 'fecha_rechazo'
+  RECHAZO: 'fecha_rechazo',
+  VALIDACION: 'fecha_validacion',
+  VISITA: 'fecha_visita'
 };
 
 // ========================================
@@ -108,10 +251,39 @@ export const normalizeEmpresaData = (data) => {
   normalized[CAMPOS_FECHA.ACTIVACION] = data.fecha_activacion || data.fechaActivacion || null;
   normalized[CAMPOS_FECHA.ACTUALIZACION] = data.fecha_actualizacion || data.fechaActualizacion || new Date();
   
-  // Estado - normalizar a minúscula
-  normalized.estado = (data.estado || 'pendiente').toLowerCase();
+  // Estado - normalizar a minúscula y usar estados unificados
+  const estadoOriginal = data.estado || 'pendiente';
+  normalized.estado = normalizarEstado(estadoOriginal);
   
   return normalized;
+};
+
+/**
+ * Normaliza estado a formato unificado
+ */
+export const normalizarEstado = (estado) => {
+  const estadoLower = estado.toLowerCase();
+  
+  // Mapeo de estados antiguos a nuevos
+  const mapeoEstados = {
+    'enviada': ESTADOS_EMPRESA.CATALOGADA,
+    'enviado': ESTADOS_EMPRESA.CATALOGADA,
+    'pendiente': ESTADOS_EMPRESA.PENDIENTE_VALIDACION,
+    'en revisión': ESTADOS_EMPRESA.PENDIENTE_VALIDACION,
+    'en_revision': ESTADOS_EMPRESA.PENDIENTE_VALIDACION,
+    'validada': ESTADOS_EMPRESA.VALIDADA,
+    'validado': ESTADOS_EMPRESA.VALIDADA,
+    'activa': ESTADOS_EMPRESA.ACTIVA,
+    'activo': ESTADOS_EMPRESA.ACTIVA,
+    'activada': ESTADOS_EMPRESA.ACTIVA,
+    'suspendida': ESTADOS_EMPRESA.SUSPENDIDA,
+    'inactiva': ESTADOS_EMPRESA.INACTIVA,
+    'inactivo': ESTADOS_EMPRESA.INACTIVA,
+    'rechazada': ESTADOS_EMPRESA.RECHAZADA,
+    'rechazado': ESTADOS_EMPRESA.RECHAZADA
+  };
+  
+  return mapeoEstados[estadoLower] || ESTADOS_EMPRESA.PENDIENTE_VALIDACION;
 };
 
 /**
@@ -378,9 +550,15 @@ export const getSolicitudesPendientesQuery = () => {
 export default {
   ESTADOS_SOLICITUD,
   ESTADOS_EMPRESA,
+  FLUJO_EMPRESA,
+  FLUJO_SOLICITUD,
   CAMPOS_EMPRESA,
   CAMPOS_REPRESENTANTE,
   CAMPOS_FECHA,
+  puedeTransicionar,
+  obtenerSiguientesEstados,
+  obtenerDescripcionEstado,
+  normalizarEstado,
   normalizeEmpresaData,
   normalizeSolicitudData,
   validateEmpresaData,

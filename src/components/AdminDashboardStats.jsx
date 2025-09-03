@@ -41,18 +41,54 @@ export default function AdminDashboardStats() {
   const loadStats = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Cargando estadísticas del admin...');
       
-      // Estadísticas de clientes
-      const clientesSnapshot = await getDocs(collection(db, 'perfiles_clientes'));
-      const clientes = clientesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Estadísticas de clientes - probar diferentes colecciones
+      let clientes = [];
+      try {
+        const clientesSnapshot = await getDocs(collection(db, 'clientes'));
+        clientes = clientesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('👥 Clientes encontrados:', clientes.length);
+      } catch (error) {
+        console.log('⚠️ No se encontró colección "clientes", probando "perfiles_clientes"');
+        try {
+          const perfilesSnapshot = await getDocs(collection(db, 'perfiles_clientes'));
+          clientes = perfilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          console.log('👥 Perfiles de clientes encontrados:', clientes.length);
+        } catch (error2) {
+          console.log('⚠️ No se encontró colección "perfiles_clientes"');
+        }
+      }
       
-      // Estadísticas de vehículos - usar la colección correcta
-      const vehiculosSnapshot = await getDocs(collection(db, 'vehiculos'));
-      const vehiculos = vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Estadísticas de empresas
+      let empresas = [];
+      try {
+        const empresasSnapshot = await getDocs(collection(db, 'empresas'));
+        empresas = empresasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('🏢 Empresas encontradas:', empresas.length);
+      } catch (error) {
+        console.log('⚠️ No se encontró colección "empresas"');
+      }
+      
+      // Estadísticas de vehículos
+      let vehiculos = [];
+      try {
+        const vehiculosSnapshot = await getDocs(collection(db, 'vehiculos'));
+        vehiculos = vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('🚗 Vehículos encontrados:', vehiculos.length);
+      } catch (error) {
+        console.log('⚠️ No se encontró colección "vehiculos"');
+      }
       
       // Estadísticas de notificaciones
-      const notificacionesSnapshot = await getDocs(collection(db, 'notificaciones'));
-      const notificaciones = notificacionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let notificaciones = [];
+      try {
+        const notificacionesSnapshot = await getDocs(collection(db, 'notificaciones'));
+        notificaciones = notificacionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('🔔 Notificaciones encontradas:', notificaciones.length);
+      } catch (error) {
+        console.log('⚠️ No se encontró colección "notificaciones"');
+      }
       
       // Calcular fechas
       const ahora = new Date();
@@ -67,17 +103,25 @@ export default function AdminDashboardStats() {
       const statsClientes = processClientStats(clientes);
       const statsVehiculos = processVehicleStats(vehiculos);
       const statsNotificaciones = processNotificationStats(notificaciones);
-      const statsActividad = processActivityStats(clientes, ahora, ayer, hace7dias, hace30dias);
+      const statsActividad = processActivityStats([...clientes, ...empresas], ahora, ayer, hace7dias, hace30dias);
       
-      setStats({
+      const nuevasStats = {
         clientes: statsClientes,
         vehiculos: statsVehiculos,
         notificaciones: statsNotificaciones,
-        actividad: statsActividad
-      });
+        actividad: statsActividad,
+        empresas: {
+          total: empresas.length,
+          activas: empresas.filter(e => e.estado === 'activa' || e.estado === 'Activa').length,
+          pendientes: empresas.filter(e => e.estado === 'pendiente' || e.estado === 'en_revision').length
+        }
+      };
+      
+      console.log('✅ Estadísticas procesadas:', nuevasStats);
+      setStats(nuevasStats);
       
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('❌ Error cargando estadísticas:', error);
     } finally {
       setLoading(false);
     }

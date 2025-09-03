@@ -109,7 +109,7 @@ const ProviderCard = ({
         {/* Status Badge */}
         <div className="absolute top-3 right-3">
           <span className={`px-2 py-1 rounded-full text-xs font-medium bg-white/90 backdrop-blur-sm ${getStatusColor()}`}>
-            {provider.estado || 'Activa'}
+            {provider.estado || 'activa'}
           </span>
         </div>
 

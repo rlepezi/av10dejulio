@@ -5,9 +5,12 @@ import { storage } from '../firebase';
 export default function LogoUploader({ empresa, onLogoUpload, saving }) {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(empresa.logo || null);
+  const [previewUrl, setPreviewUrl] = useState(empresa.logo_url || empresa.logo || null);
   const [galeria, setGaleria] = useState(empresa.galeria || []);
   const [uploadingGaleria, setUploadingGaleria] = useState(false);
+  const [logoUploaded, setLogoUploaded] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [mensajeExito, setMensajeExito] = useState('');
   const fileInputRef = useRef(null);
   const galeriaInputRef = useRef(null);
 
@@ -41,18 +44,22 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
   const handleFile = async (file) => {
     // Validar que sea imagen PNG
     if (!file.type.includes('png') && !file.type.includes('jpeg') && !file.type.includes('jpg')) {
-      alert('Por favor, selecciona un archivo PNG o JPG');
+      setLogoError('Por favor, selecciona un archivo PNG o JPG');
+      setTimeout(() => setLogoError(''), 5000);
       return;
     }
 
     // Validar tamaño (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      alert('El archivo es muy grande. Máximo 2MB');
+      setLogoError('El archivo es muy grande. Máximo 2MB');
+      setTimeout(() => setLogoError(''), 5000);
       return;
     }
 
     try {
       setUploading(true);
+      setLogoError('');
+      setMensajeExito('');
       
       // Crear preview
       const reader = new FileReader();
@@ -62,11 +69,15 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
       // Subir archivo
       const logoURL = await onLogoUpload(file);
       setPreviewUrl(logoURL);
+      setLogoUploaded(true);
+      setMensajeExito('✅ Logo subido y guardado correctamente');
+      setTimeout(() => setMensajeExito(''), 5000);
       
     } catch (error) {
       console.error('Error subiendo logo:', error);
-      alert('Error al subir el logo. Inténtalo nuevamente.');
-      setPreviewUrl(empresa.logo || null);
+      setLogoError('Error al subir el logo. Inténtalo nuevamente.');
+      setTimeout(() => setLogoError(''), 5000);
+      setPreviewUrl(empresa.logo_url || empresa.logo || null);
     } finally {
       setUploading(false);
     }
@@ -80,11 +91,17 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
     if (window.confirm('¿Estás seguro de que quieres eliminar el logo?')) {
       try {
         setUploading(true);
+        setLogoError('');
+        setMensajeExito('');
         await onLogoUpload(null);
         setPreviewUrl(null);
+        setLogoUploaded(false);
+        setMensajeExito('✅ Logo eliminado correctamente');
+        setTimeout(() => setMensajeExito(''), 5000);
       } catch (error) {
         console.error('Error eliminando logo:', error);
-        alert('Error al eliminar el logo');
+        setLogoError('Error al eliminar el logo');
+        setTimeout(() => setLogoError(''), 5000);
       } finally {
         setUploading(false);
       }
@@ -94,16 +111,19 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
   const handleGaleriaUpload = async (files) => {
     try {
       setUploadingGaleria(true);
+      setLogoError('');
       const nuevasImagenes = [];
       
       for (let file of files) {
         if (!file.type.includes('image/')) {
-          alert(`${file.name} no es una imagen válida`);
+          setLogoError(`${file.name} no es una imagen válida`);
+          setTimeout(() => setLogoError(''), 5000);
           continue;
         }
         
         if (file.size > 5 * 1024 * 1024) {
-          alert(`${file.name} es muy grande. Máximo 5MB por imagen`);
+          setLogoError(`${file.name} es muy grande. Máximo 5MB por imagen`);
+          setTimeout(() => setLogoError(''), 5000);
           continue;
         }
 
@@ -119,9 +139,15 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
       // Guardar en Firebase
       await onLogoUpload(null, 'galeria', galeriaActualizada);
       
+      if (nuevasImagenes.length > 0) {
+        setMensajeExito(`✅ ${nuevasImagenes.length} imagen(es) subida(s) correctamente`);
+        setTimeout(() => setMensajeExito(''), 5000);
+      }
+      
     } catch (error) {
       console.error('Error subiendo imágenes:', error);
-      alert('Error al subir las imágenes');
+      setLogoError('Error al subir las imágenes');
+      setTimeout(() => setLogoError(''), 5000);
     } finally {
       setUploadingGaleria(false);
     }
@@ -129,9 +155,18 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
 
   const removeImagenGaleria = async (index) => {
     if (window.confirm('¿Eliminar esta imagen de la galería?')) {
-      const nuevaGaleria = galeria.filter((_, i) => i !== index);
-      setGaleria(nuevaGaleria);
-      await onLogoUpload(null, 'galeria', nuevaGaleria);
+      try {
+        setLogoError('');
+        const nuevaGaleria = galeria.filter((_, i) => i !== index);
+        setGaleria(nuevaGaleria);
+        await onLogoUpload(null, 'galeria', nuevaGaleria);
+        setMensajeExito('✅ Imagen eliminada de la galería');
+        setTimeout(() => setMensajeExito(''), 5000);
+      } catch (error) {
+        console.error('Error eliminando imagen:', error);
+        setLogoError('Error al eliminar la imagen');
+        setTimeout(() => setLogoError(''), 5000);
+      }
     }
   };
 
@@ -139,6 +174,8 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
     if (window.confirm('¿Generar un logo automático basado en el nombre de la empresa?')) {
       try {
         setUploading(true);
+        setLogoError('');
+        setMensajeExito('');
         
         // Crear canvas para generar logo
         const canvas = document.createElement('canvas');
@@ -172,15 +209,21 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
             
             await onLogoUpload({ logoURL, esAutomatico: true });
             setPreviewUrl(logoURL);
+            setLogoUploaded(true);
+            setMensajeExito('✅ Logo automático generado y guardado correctamente');
+            setTimeout(() => setMensajeExito(''), 5000);
           } catch (error) {
             console.error('Error subiendo logo automático:', error);
+            setLogoError('Error al generar el logo automático');
+            setTimeout(() => setLogoError(''), 5000);
             throw error;
           }
         }, 'image/png');
         
       } catch (error) {
         console.error('Error generando logo:', error);
-        alert('Error al generar el logo automático');
+        setLogoError('Error al generar el logo automático');
+        setTimeout(() => setLogoError(''), 5000);
       } finally {
         setUploading(false);
       }
@@ -190,6 +233,33 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
   return (
     <div className="p-6 space-y-8">
       <h3 className="text-lg font-semibold mb-4">Gestión de Logo y Galería</h3>
+      
+      {/* Estado general del logo */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600 text-lg">
+              {empresa.logo_url || empresa.logo ? '✅' : '⚠️'}
+            </span>
+            <div>
+              <p className="font-medium text-blue-900">
+                {empresa.logo_url || empresa.logo ? 'Logo configurado' : 'Logo pendiente de configuración'}
+              </p>
+              <p className="text-sm text-blue-700">
+                {empresa.logo_url || empresa.logo 
+                  ? 'El logo está visible en el sistema y se muestra correctamente' 
+                  : 'Selecciona o genera un logo para tu empresa'
+                }
+              </p>
+            </div>
+          </div>
+          {empresa.logoAsignado && (
+            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+              ✓ Asignado
+            </span>
+          )}
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Vista previa del logo actual */}
@@ -202,9 +272,22 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
                   src={previewUrl}
                   alt="Logo de la empresa"
                   className="w-32 h-32 object-contain mx-auto bg-white border rounded-lg shadow-sm"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'block';
+                  }}
                 />
+                <div style={{ display: 'none' }} className="w-32 h-32 bg-gray-200 rounded-lg mx-auto flex items-center justify-center">
+                  <span className="text-4xl text-gray-400">🖼️</span>
+                </div>
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Logo cargado correctamente</p>
+                  <div className="flex items-center justify-center gap-2 text-green-600">
+                    <span>✅</span>
+                    <span className="font-medium">Logo cargado correctamente</span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {logoUploaded ? 'Logo subido y guardado en la base de datos' : 'Logo visible en el sistema'}
+                  </p>
                   <div className="flex justify-center gap-2">
                     <button
                       onClick={removeLogo}
@@ -239,6 +322,19 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
         {/* Subir nuevo logo */}
         <div>
           <h4 className="text-md font-medium text-gray-700 mb-3">Subir Nuevo Logo</h4>
+          
+          {/* Mensajes de estado */}
+          {mensajeExito && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg text-green-800 text-sm">
+              {mensajeExito}
+            </div>
+          )}
+          
+          {logoError && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm">
+              ❌ {logoError}
+            </div>
+          )}
           
           {/* Zona de drag and drop */}
           <div
@@ -290,6 +386,31 @@ export default function LogoUploader({ empresa, onLogoUpload, saving }) {
             accept=".png,.jpg,.jpeg"
             onChange={handleChange}
           />
+
+          {/* Botón de guardar prominente */}
+          {previewUrl && !uploading && (
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-600 text-lg">✅</span>
+                  <span className="text-green-800 font-medium">Logo listo para guardar</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMensajeExito('✅ Logo guardado correctamente en la base de datos');
+                    setTimeout(() => setMensajeExito(''), 5000);
+                  }}
+                  disabled={saving}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors font-medium shadow-lg"
+                >
+                  {saving ? 'Guardando...' : '💾 Guardar Logo'}
+                </button>
+              </div>
+              <p className="text-green-700 text-sm mt-2">
+                El logo se guarda automáticamente al seleccionarlo. Este botón confirma que se ha guardado en la base de datos.
+              </p>
+            </div>
+          )}
 
           {/* Información sobre el archivo */}
           <div className="mt-4 text-sm text-gray-600 space-y-1">

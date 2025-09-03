@@ -2,37 +2,106 @@ import React, { useEffect, useState } from "react";
 import { db } from "../firebase";
 import { collection, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { crearTodasLasEmpresas, crearSolicitudesEjemplo, crearSolicitudesClientesEjemplo } from "../addInfo";
+
+import { ESTADOS_EMPRESA, obtenerDescripcionEstado, puedeTransicionar } from "../utils/empresaStandards";
+import { useImageUrl } from '../hooks/useImageUrl';
 
 function getImagePath(value) {
   if (!value) return "";
   if (value.startsWith("http")) return value;
+  if (value.startsWith("gs://")) return value; // Firebase Storage URLs will be handled by useImageUrl hook
   return `/images/${value}`;
 }
 
 function colorEstado(estado) {
   if (!estado) return "bg-gray-200 text-gray-700";
-  switch (estado.toLowerCase()) {
+  
+  // Normalizar el estado para comparación
+  const estadoNormalizado = estado.toLowerCase();
+  
+  switch (estadoNormalizado) {
     case "activa":
     case "activo":
       return "bg-green-100 text-green-700";
+    case "validada":
+      return "bg-blue-100 text-blue-700";
+    case "pendiente_validacion":
+    case "pendiente de validación":
+      return "bg-yellow-100 text-yellow-700";
+    case "en_visita":
+    case "en visita":
+      return "bg-purple-100 text-purple-700";
+    case "catalogada":
+      return "bg-indigo-100 text-indigo-700";
+    case "ingresada":
+      return "bg-teal-100 text-teal-700";
     case "inactiva":
     case "inactivo":
       return "bg-red-200 text-red-800";
     case "suspendida":
     case "suspendido":
       return "bg-orange-200 text-orange-800";
+    case "rechazada":
+      return "bg-red-300 text-red-900";
     default:
       return "bg-gray-100 text-gray-700";
   }
 }
 
-const ESTADOS_EMPRESA = [
+const ESTADOS_FILTRO = [
   { label: "Todos", value: "todos" },
-  { label: "Activa", value: "Activa" },
-  { label: "Inactiva", value: "inactiva" },
-  { label: "Suspendida", value: "suspendida" }
+  { label: "Catastro Inicial", value: "catastro_inicial" },
+  { label: "Catalogada", value: ESTADOS_EMPRESA.CATALOGADA },
+  { label: "Ingresada", value: "ingresada" },
+  { label: "Pendiente de Validación", value: ESTADOS_EMPRESA.PENDIENTE_VALIDACION },
+  { label: "En Visita", value: ESTADOS_EMPRESA.EN_VISITA },
+  { label: "Validada", value: ESTADOS_EMPRESA.VALIDADA },
+  { label: "Activa", value: ESTADOS_EMPRESA.ACTIVA },
+  { label: "Suspendida", value: ESTADOS_EMPRESA.SUSPENDIDA },
+  { label: "Inactiva", value: ESTADOS_EMPRESA.INACTIVA },
+  { label: "Rechazada", value: ESTADOS_EMPRESA.RECHAZADA }
 ];
+
+// Componente para mostrar logo con manejo de URLs de Firebase Storage
+function LogoImage({ logo, nombre, className = "h-12 w-12 rounded object-cover" }) {
+  const { imageUrl, loading, error } = useImageUrl(logo);
+
+  if (!logo) {
+    return (
+      <div className={`${className} bg-gray-200 flex items-center justify-center`}>
+        <span className="text-xs text-gray-500">Sin logo</span>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className={`${className} bg-gray-200 flex items-center justify-center`}>
+        <div className="w-4 h-4 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className={`${className} bg-gray-200 flex items-center justify-center`}>
+        <span className="text-xs text-red-500">Error</span>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      className={className} 
+      src={imageUrl} 
+      alt={`Logo de ${nombre}`}
+      onError={(e) => {
+        e.target.style.display = 'none';
+        e.target.nextSibling.style.display = 'flex';
+      }}
+    />
+  );
+}
 
 export default function GestionEmpresas() {
   const [empresas, setEmpresas] = useState([]);
@@ -45,6 +114,7 @@ export default function GestionEmpresas() {
   });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('table');
+  const [empresaVistaPrevia, setEmpresaVistaPrevia] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,12 +178,41 @@ export default function GestionEmpresas() {
 
   const toggleEstado = async (empresa) => {
     try {
-      const nuevoEstado = empresa.estado === 'activa' ? 'inactiva' : 'activa';
+      // Determinar el nuevo estado basado en el estado actual
+      let nuevoEstado;
+      if (empresa.estado === ESTADOS_EMPRESA.ACTIVA) {
+        nuevoEstado = ESTADOS_EMPRESA.INACTIVA;
+      } else if (empresa.estado === ESTADOS_EMPRESA.INACTIVA) {
+        nuevoEstado = ESTADOS_EMPRESA.ACTIVA;
+      } else if (empresa.estado === ESTADOS_EMPRESA.VALIDADA) {
+        nuevoEstado = ESTADOS_EMPRESA.ACTIVA;
+      } else if (empresa.estado === ESTADOS_EMPRESA.CATALOGADA) {
+        nuevoEstado = ESTADOS_EMPRESA.PENDIENTE_VALIDACION;
+      } else if (empresa.estado === ESTADOS_EMPRESA.INGRESADA) {
+        // Para empresas ingresadas, dar opción al admin
+        const opcion = window.confirm(
+          `Empresa: ${empresa.nombre}\n\n` +
+          `Estado actual: Ingresada\n\n` +
+          `¿Qué quieres hacer?\n` +
+          `• OK = Activar directamente (ir a estado "Activa")\n` +
+          `• Cancelar = Asignar a validación (ir a estado "Pendiente de Validación")`
+        );
+        
+        nuevoEstado = opcion ? ESTADOS_EMPRESA.ACTIVA : ESTADOS_EMPRESA.PENDIENTE_VALIDACION;
+      } else {
+        nuevoEstado = ESTADOS_EMPRESA.ACTIVA;
+      }
+
       await updateDoc(doc(db, "empresas", empresa.id), {
         estado: nuevoEstado,
         fecha_actualizacion: new Date()
       });
-      alert(`Empresa ${nuevoEstado} exitosamente`);
+      
+      const mensaje = nuevoEstado === ESTADOS_EMPRESA.ACTIVA 
+        ? `Empresa ${empresa.nombre} activada exitosamente` 
+        : `Empresa ${empresa.nombre} asignada a validación exitosamente`;
+      
+      alert(mensaje);
     } catch (error) {
       console.error('Error cambiando estado:', error);
       alert('Error al cambiar el estado');
@@ -124,7 +223,7 @@ export default function GestionEmpresas() {
     if (window.confirm(`¿Estás seguro de suspender a ${empresa.nombre}?`)) {
       try {
         await updateDoc(doc(db, "empresas", empresa.id), {
-          estado: 'suspendida',
+          estado: ESTADOS_EMPRESA.SUSPENDIDA,
           fecha_suspension: new Date(),
           fecha_actualizacion: new Date()
         });
@@ -148,34 +247,18 @@ export default function GestionEmpresas() {
     }
   };
 
-  const crearDatosEjemplo = async () => {
-    if (window.confirm('¿Quieres crear 5 empresas de ejemplo para testing? Esto te ayudará a probar la funcionalidad.')) {
-      try {
-        await crearTodasLasEmpresas();
-        alert('✅ Empresas de ejemplo creadas exitosamente');
-      } catch (error) {
-        console.error('Error creando empresas de ejemplo:', error);
-        alert('❌ Error creando empresas de ejemplo');
-      }
-    }
-  };
 
-  const crearSolicitudesDeEjemplo = async () => {
-    if (window.confirm('¿Quieres crear solicitudes de empresas y clientes de ejemplo? Esto ayudará a probar el dashboard.')) {
-      try {
-        await crearSolicitudesEjemplo();
-        await crearSolicitudesClientesEjemplo();
-        alert('✅ Solicitudes de ejemplo creadas exitosamente');
-      } catch (error) {
-        console.error('Error creando solicitudes de ejemplo:', error);
-        alert('❌ Error creando solicitudes de ejemplo');
-      }
-    }
-  };
 
   // Filtrar empresas
   const empresasFiltradas = empresas.filter(empresa => {
-    const matchEstado = filtros.estado === "todos" || empresa.estado === filtros.estado;
+    let matchEstado = filtros.estado === "todos";
+    
+    if (filtros.estado === "catastro_inicial") {
+      // Filtrar por catastro inicial (catalogadas + ingresadas)
+      matchEstado = empresa.estado === ESTADOS_EMPRESA.CATALOGADA || empresa.estado === ESTADOS_EMPRESA.INGRESADA;
+    } else if (filtros.estado !== "todos") {
+      matchEstado = empresa.estado === filtros.estado;
+    }
     
     const matchBusqueda = !filtros.busqueda || 
       empresa.nombre?.toLowerCase().includes(filtros.busqueda.toLowerCase()) ||
@@ -200,9 +283,19 @@ export default function GestionEmpresas() {
   
   const estadisticas = {
     total: empresas.length,
-    activas: empresas.filter(e => e.estado === 'Activa').length,
-    inactivas: empresas.filter(e => e.estado === 'Inactiva').length,
-    suspendidas: empresas.filter(e => e.estado === 'Suspendida').length,
+    // Catastro inicial: incluye tanto catalogadas como ingresadas
+    catastroInicial: empresas.filter(e => 
+      e.estado === ESTADOS_EMPRESA.CATALOGADA || e.estado === 'ingresada'
+    ).length,
+    catalogadas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.CATALOGADA).length,
+            ingresadas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.INGRESADA).length,
+    pendientes: empresas.filter(e => e.estado === ESTADOS_EMPRESA.PENDIENTE_VALIDACION).length,
+    enVisita: empresas.filter(e => e.estado === ESTADOS_EMPRESA.EN_VISITA).length,
+    validadas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.VALIDADA).length,
+    activas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.ACTIVA).length,
+    suspendidas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.SUSPENDIDA).length,
+    inactivas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.INACTIVA).length,
+    rechazadas: empresas.filter(e => e.estado === ESTADOS_EMPRESA.RECHAZADA).length,
     sinWeb: empresas.filter(e => !e.web).length,
     sinLogo: empresas.filter(e => !e.logoAsignado).length
   };
@@ -298,31 +391,13 @@ export default function GestionEmpresas() {
           </p>
         </div>
         
-        {/* Botón de debug - temporal para desarrollo */}
+        {/* Botón Crear Empresa Pública */}
         <div className="flex items-center gap-2">
           <button
-            onClick={crearDatosEjemplo}
-            className="bg-green-100 text-green-700 px-3 py-1 rounded text-sm hover:bg-green-200 transition-colors"
-            title="Crear empresas de ejemplo para testing"
+            onClick={() => navigate("/admin/crear-empresa-publica")}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium"
           >
-            🧪 Crear Empresas
-          </button>
-          <button
-            onClick={crearSolicitudesDeEjemplo}
-            className="bg-orange-100 text-orange-700 px-3 py-1 rounded text-sm hover:bg-orange-200 transition-colors"
-            title="Crear solicitudes de ejemplo para testing"
-          >
-            📋 Crear Solicitudes
-          </button>
-          <button
-            onClick={() => {
-              console.log('🔍 Estado actual:', { empresas, loading });
-              console.log('📊 Empresas filtradas:', empresasFiltradas);
-            }}
-            className="bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200 transition-colors"
-            title="Ver estado en consola"
-          >
-            🔍 Debug Log
+            ➕ Crear Empresa Pública
           </button>
         </div>
       </div>
@@ -361,30 +436,42 @@ export default function GestionEmpresas() {
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-4 mb-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-blue-800">{estadisticas.total}</div>
           <div className="text-blue-600 text-sm">Total</div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-gray-800">{estadisticas.catastroInicial}</div>
+          <div className="text-gray-600 text-sm">Catastro Inicial</div>
+        </div>
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-indigo-800">{estadisticas.catalogadas}</div>
+          <div className="text-indigo-600 text-sm">Catalogadas</div>
+        </div>
+        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-teal-800">{estadisticas.ingresadas}</div>
+          <div className="text-teal-600 text-sm">Ingresadas</div>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-yellow-800">{estadisticas.pendientes}</div>
+          <div className="text-yellow-600 text-sm">Pendientes</div>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-purple-800">{estadisticas.enVisita}</div>
+          <div className="text-purple-600 text-sm">En Visita</div>
+        </div>
+        <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-900">{estadisticas.validadas}</div>
+          <div className="text-blue-700 text-sm">Validadas</div>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-green-800">{estadisticas.activas}</div>
           <div className="text-green-600 text-sm">Activas</div>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-red-800">{estadisticas.inactivas}</div>
-          <div className="text-red-600 text-sm">Inactivas</div>
-        </div>
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-orange-800">{estadisticas.suspendidas}</div>
           <div className="text-orange-600 text-sm">Suspendidas</div>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-yellow-800">{estadisticas.sinWeb}</div>
-          <div className="text-yellow-600 text-sm">Sin Web</div>
-        </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-purple-800">{estadisticas.sinLogo}</div>
-          <div className="text-purple-600 text-sm">Sin Logo</div>
         </div>
       </div>
 
@@ -398,7 +485,7 @@ export default function GestionEmpresas() {
               onChange={(e) => setFiltros({...filtros, estado: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {ESTADOS_EMPRESA.map(est => (
+              {ESTADOS_FILTRO.map(est => (
                 <option key={est.value} value={est.value}>{est.label}</option>
               ))}
             </select>
@@ -468,23 +555,36 @@ export default function GestionEmpresas() {
 
       {/* Resultados */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">
-            Empresas ({empresasFiltradas.length})
-          </h3>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-2 rounded ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
-            >
-              📋 Tabla
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
-            >
-              📱 Tarjetas
-            </button>
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-medium text-gray-900">
+              Empresas ({empresasFiltradas.length})
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-2 rounded ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+              >
+                📋 Tabla
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}
+              >
+                📱 Tarjetas
+              </button>
+            </div>
+          </div>
+          
+          {/* Información sobre el botón de perfil del proveedor */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-green-600">💡</span>
+              <p className="text-sm text-green-800">
+                <strong>Acceso rápido al perfil del proveedor:</strong> Usa el botón verde "👤 Ver Perfil Proveedor" 
+                para ver exactamente lo que ven los clientes y detectar problemas caso por caso.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -496,7 +596,7 @@ export default function GestionEmpresas() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Logo</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contacto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Web/Perfil</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sitio Web</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                 </tr>
@@ -505,17 +605,11 @@ export default function GestionEmpresas() {
                 {empresasFiltradas.map((empresa) => (
                   <tr key={empresa.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      {empresa.logo ? (
-                        <img
-                          src={getImagePath(empresa.logo)}
-                          alt="Logo"
-                          className="w-12 h-12 object-contain rounded border"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                          Sin Logo
-                        </div>
-                      )}
+                      <LogoImage 
+                        logo={empresa.logo_url || empresa.logo} 
+                        nombre={empresa.nombre} 
+                        className="w-12 h-12 object-contain rounded border"
+                      />
                     </td>
                     <td className="px-6 py-4">
                       <div>
@@ -541,14 +635,9 @@ export default function GestionEmpresas() {
                           🌐 Sitio Web
                         </a>
                       ) : (
-                        <a
-                          href={`/empresa/${empresa.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600 hover:text-green-800 text-sm underline"
-                        >
-                          👤 Ver Perfil
-                        </a>
+                        <span className="text-gray-400 text-sm">
+                          Sin sitio web
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
@@ -558,6 +647,21 @@ export default function GestionEmpresas() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
+                        {/* Botón principal para ver dashboard interno del proveedor */}
+                        <button
+                          onClick={() => window.open(`/perfil-proveedor/${empresa.id}`, '_blank')}
+                          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                          title="Ver dashboard interno del proveedor (como lo ve el proveedor)"
+                        >
+                          👤 Ver Dashboard Proveedor
+                        </button>
+                        
+                        <button
+                          onClick={() => setEmpresaVistaPrevia(empresa)}
+                          className="text-purple-600 hover:text-purple-800 text-sm underline"
+                        >
+                          👁️ Vista Previa
+                        </button>
                         <button
                           onClick={() => navigate(`/admin/editar-empresa/${empresa.id}`)}
                           className="text-blue-600 hover:text-blue-800 text-sm underline"
@@ -567,12 +671,12 @@ export default function GestionEmpresas() {
                         <button
                           onClick={() => toggleEstado(empresa)}
                           className={`text-sm underline ${
-                            empresa.estado === 'activa' ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'
+                            empresa.estado === ESTADOS_EMPRESA.ACTIVA ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'
                           }`}
                         >
-                          {empresa.estado === 'activa' ? 'Desactivar' : 'Activar'}
+                          {empresa.estado === ESTADOS_EMPRESA.ACTIVA ? 'Desactivar' : 'Activar'}
                         </button>
-                        {empresa.estado !== 'suspendida' && (
+                        {empresa.estado !== ESTADOS_EMPRESA.SUSPENDIDA && (
                           <button
                             onClick={() => suspenderEmpresa(empresa)}
                             className="text-orange-600 hover:text-orange-800 text-sm underline"
@@ -599,17 +703,11 @@ export default function GestionEmpresas() {
             {empresasFiltradas.map((empresa) => (
               <div key={empresa.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4 mb-3">
-                  {empresa.logo ? (
-                    <img
-                      src={getImagePath(empresa.logo)}
-                      alt="Logo"
-                      className="w-16 h-16 object-contain rounded border"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center text-gray-400">
-                      Sin Logo
-                    </div>
-                  )}
+                  <LogoImage 
+                    logo={empresa.logo_url || empresa.logo} 
+                    nombre={empresa.nombre} 
+                    className="w-16 h-16 object-contain rounded border"
+                  />
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900">{empresa.nombre}</h3>
                     <p className="text-sm text-gray-500">{empresa.categoria}</p>
@@ -626,25 +724,42 @@ export default function GestionEmpresas() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  {empresa.web ? (
-                    <a
-                      href={empresa.web.startsWith("http") ? empresa.web : `https://${empresa.web}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 text-sm underline"
+                  <div className="flex gap-2">
+                    {/* Botón principal para ver dashboard interno del proveedor */}
+                    <button
+                      onClick={() => window.open(`/perfil-empresa/${empresa.id}`, '_blank')}
+                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                      title="Ver dashboard interno del proveedor (como lo ve el proveedor)"
                     >
-                      🌐 Web
-                    </a>
-                  ) : (
-                    <a
-                      href={`/empresa/${empresa.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 text-sm underline"
+                      👤 Ver Dashboard Proveedor
+                    </button>
+                    
+                    <button
+                      onClick={() => setEmpresaVistaPrevia(empresa)}
+                      className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
                     >
-                      👤 Perfil
-                    </a>
-                  )}
+                      👁️ Vista Previa
+                    </button>
+                    {empresa.web ? (
+                      <a
+                        href={empresa.web.startsWith("http") ? empresa.web : `https://${empresa.web}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        🌐 Web
+                      </a>
+                    ) : (
+                      <a
+                        href={`/empresa/${empresa.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                      >
+                        👤 Perfil
+                      </a>
+                    )}
+                  </div>
                   
                   <button
                     onClick={() => navigate(`/admin/editar-empresa/${empresa.id}`)}
@@ -664,6 +779,152 @@ export default function GestionEmpresas() {
           </div>
         )}
       </div>
+
+      {/* Modal de Vista Previa */}
+      {empresaVistaPrevia && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Vista Previa: {empresaVistaPrevia.nombre}
+                </h2>
+                <button
+                  onClick={() => setEmpresaVistaPrevia(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Información Básica */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <LogoImage 
+                      logo={empresaVistaPrevia.logo_url || empresaVistaPrevia.logo} 
+                      nombre={empresaVistaPrevia.nombre} 
+                      className="w-24 h-24 object-contain rounded border"
+                    />
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{empresaVistaPrevia.nombre}</h3>
+                      <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${colorEstado(empresaVistaPrevia.estado)}`}>
+                        {empresaVistaPrevia.estado || "Sin estado"}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div><strong>Categoría:</strong> {empresaVistaPrevia.categoria || 'No especificada'}</div>
+                    <div><strong>Dirección:</strong> {empresaVistaPrevia.direccion || 'No especificada'}</div>
+                    <div><strong>Teléfono:</strong> {empresaVistaPrevia.telefono || 'No especificado'}</div>
+                    <div><strong>Email:</strong> {empresaVistaPrevia.email || 'No especificado'}</div>
+                    {empresaVistaPrevia.web && (
+                      <div>
+                        <strong>Sitio Web:</strong> 
+                        <a 
+                          href={empresaVistaPrevia.web.startsWith("http") ? empresaVistaPrevia.web : `https://${empresaVistaPrevia.web}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 ml-2 underline"
+                        >
+                          {empresaVistaPrevia.web}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Información Adicional */}
+                <div className="space-y-4">
+                  {empresaVistaPrevia.descripcion && (
+                    <div>
+                      <strong>Descripción:</strong>
+                      <p className="mt-1 text-gray-700">{empresaVistaPrevia.descripcion}</p>
+                    </div>
+                  )}
+                  
+                  {empresaVistaPrevia.horarios && (
+                    <div>
+                      <strong>Horarios:</strong>
+                      <p className="mt-1 text-gray-700">
+                        {typeof empresaVistaPrevia.horarios === 'string' 
+                          ? empresaVistaPrevia.horarios 
+                          : empresaVistaPrevia.horarios?.general || 'No especificados'}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {empresaVistaPrevia.marcas && empresaVistaPrevia.marcas.length > 0 && (
+                    <div>
+                      <strong>Marcas:</strong>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {empresaVistaPrevia.marcas.map((marca, index) => (
+                          <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                            {marca}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <button
+                  onClick={() => setEmpresaVistaPrevia(null)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cerrar
+                </button>
+                
+                {/* Botón para ver perfil público (como lo ven los clientes) */}
+                <a
+                  href={`/empresa/${empresaVistaPrevia.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                >
+                  👤 Ver Perfil Público
+                </a>
+                
+                {/* Botón para ver dashboard interno del proveedor */}
+                <a
+                  href={`/perfil-proveedor/${empresaVistaPrevia.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  🏢 Ver Dashboard Interno
+                </a>
+                
+                {/* Botón para sitio web (solo si existe) */}
+                {empresaVistaPrevia.web && (
+                  <a
+                    href={empresaVistaPrevia.web.startsWith("http") ? empresaVistaPrevia.web : `https://${empresaVistaPrevia.web}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    🌐 Página Web
+                  </a>
+                )}
+                
+                <button
+                  onClick={() => {
+                    setEmpresaVistaPrevia(null);
+                    navigate(`/admin/editar-empresa/${empresaVistaPrevia.id}`);
+                  }}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                >
+                  ✏️ Editar Empresa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

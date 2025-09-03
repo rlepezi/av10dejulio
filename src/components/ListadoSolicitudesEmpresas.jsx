@@ -21,7 +21,7 @@ export default function ListadoSolicitudesEmpresas() {
       nombre: solicitud.encargado.nombre,
       email: solicitud.encargado.email,
       telefono: solicitud.encargado.telefono,
-      rol: "proveedor",
+              rol: "proveedor",
       empresaId: solicitud.id
     });
     await setDoc(doc(db, "empresas", solicitud.id), {

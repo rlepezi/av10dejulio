@@ -103,11 +103,14 @@ export default function PerfilEmpresaWeb({ empresa, onUpdate }) {
           {/* Header de la empresa */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
             <div className="flex items-center gap-6">
-              {empresa.logo && (
+              {(empresa.logo_url || empresa.logo) && (
                 <img 
-                  src={empresa.logo} 
+                  src={empresa.logo_url || empresa.logo} 
                   alt={empresa.nombre}
                   className="w-20 h-20 bg-white rounded-lg p-2 object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
                 />
               )}
               <div>

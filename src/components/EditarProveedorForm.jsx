@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc, collection, getDocs, setDoc } from "firebase/fi
 import { db } from "../firebase";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { useImageUrl } from '../hooks/useImageUrl';
 
 // --- HorarioDetalladoComponente ---
 const diasSemana = [
@@ -169,6 +170,9 @@ export default function EditarProveedorForm() {
   // Logo upload
   const [logoFile, setLogoFile] = useState(null);
   const [logoUploading, setLogoUploading] = useState(false);
+
+  // Hook para manejar la URL del logo
+  const { imageUrl: logoUrl, loading: logoLoading, error: logoError } = useImageUrl(proveedor?.logo);
 
   // Horario detallado
   const [horario, setHorario] = useState(
@@ -574,7 +578,20 @@ export default function EditarProveedorForm() {
                 {logoUploading && <span className="text-xs text-blue-700">Subiendo logo...</span>}
                 {proveedor.logo && (
                   <div className="mt-2">
-                    <img src={proveedor.logo} alt="Logo empresa" className="h-16 rounded border" />
+                                            {logoLoading ? (
+                          <div className="h-16 w-16 bg-gray-200 rounded border flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin"></div>
+                          </div>
+                        ) : logoUrl ? (
+                          <img src={logoUrl} alt="Logo empresa" className="h-16 rounded border" />
+                        ) : (
+                          <div className="h-16 w-16 bg-gray-200 rounded border flex items-center justify-center">
+                            <span className="text-xs text-gray-500">Sin logo</span>
+                          </div>
+                        )}
+                        {logoError && (
+                          <span className="text-red-500 text-sm">Error: {logoError}</span>
+                        )}
                     <div className="text-xs text-gray-500 break-all">{proveedor.logo}</div>
                   </div>
                 )}
