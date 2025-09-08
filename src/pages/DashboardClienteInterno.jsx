@@ -5,9 +5,9 @@ import { db } from '../firebase';
 import { useAuth } from '../components/AuthProvider';
 import ClientMembershipManager from '../components/ClientMembershipManager';
 import ClientMembershipPlans from '../components/ClientMembershipPlans';
-import ServiceSimulator from '../components/ServiceSimulator';
 import ConsultaVehiculo from '../components/ConsultaVehiculo';
 import GestionGastosVehiculo from '../components/GestionGastosVehiculo';
+import PerfilVehiculo from '../components/PerfilVehiculo';
 import AuthDebugButton from '../components/AuthDebugButton';
 import { useClientMembership } from '../hooks/useClientMembership';
 
@@ -18,6 +18,7 @@ export default function DashboardClienteInterno() {
   
   // Usar el ID del parámetro o el ID del usuario autenticado
   const idCliente = clienteId || user?.uid;
+  console.log('👤 ID Cliente:', idCliente, 'User:', user?.uid, 'ClienteId param:', clienteId);
   
   // Hook para membresía del cliente
   const {
@@ -68,6 +69,14 @@ export default function DashboardClienteInterno() {
   const [showPlansModal, setShowPlansModal] = useState(false);
   const [showConsultaVehiculoModal, setShowConsultaVehiculoModal] = useState(false);
   const [showGestionGastosModal, setShowGestionGastosModal] = useState(false);
+  const [showPerfilVehiculoModal, setShowPerfilVehiculoModal] = useState(false);
+  const [vehiculoSeleccionado, setVehiculoSeleccionado] = useState(null);
+  
+  // Debug: Log cuando cambie el estado del modal
+  useEffect(() => {
+    console.log('🔍 Estado del modal perfil vehículo:', showPerfilVehiculoModal);
+    console.log('🔍 Vehículo seleccionado:', vehiculoSeleccionado);
+  }, [showPerfilVehiculoModal, vehiculoSeleccionado]);
   
   // Estados para formularios
   const [nuevoVehiculo, setNuevoVehiculo] = useState({
@@ -149,6 +158,19 @@ export default function DashboardClienteInterno() {
       setLoading(false);
     }
   }, [idCliente, user, navigate, loading, error]);
+
+  // Actualizar estados de citas cada hora
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (citas.length > 0) {
+        actualizarEstadoCitas(citas);
+        // Recargar citas después de actualizar estados
+        fetchCitas();
+      }
+    }, 60 * 60 * 1000); // Cada hora
+
+    return () => clearInterval(interval);
+  }, [citas]);
 
   // Verificar autenticación
   useEffect(() => {
@@ -261,36 +283,173 @@ export default function DashboardClienteInterno() {
 
   const fetchVehiculos = async () => {
     try {
-      const vehiculosQuery = query(
+      console.log('🔍 Buscando vehículos para cliente:', idCliente);
+      console.log('🔍 Tipo de ID:', typeof idCliente);
+      console.log('🔍 ID del vehículo en BD:', 'FwxoUCj90lhztH62YAdjckYbRPg2');
+      console.log('🔍 IDs coinciden:', idCliente === 'FwxoUCj90lhztH62YAdjckYbRPg2');
+      
+      // Primero intentar sin orderBy para evitar errores de índice
+      let vehiculosQuery = query(
         collection(db, 'vehiculos'),
-        where('clienteId', '==', idCliente),
-        orderBy('fechaCreacion', 'desc')
+        where('clienteId', '==', idCliente)
       );
+      
+      try {
+        // Intentar con orderBy
+        vehiculosQuery = query(
+          collection(db, 'vehiculos'),
+          where('clienteId', '==', idCliente),
+          orderBy('fechaCreacion', 'desc')
+        );
+      } catch (orderByError) {
+        console.log('⚠️ Error con orderBy, usando consulta simple:', orderByError);
+        // Usar consulta simple si orderBy falla
+        vehiculosQuery = query(
+          collection(db, 'vehiculos'),
+          where('clienteId', '==', idCliente)
+        );
+      }
+      
       const vehiculosSnapshot = await getDocs(vehiculosQuery);
       const vehiculosData = vehiculosSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      console.log('🚗 Vehículos encontrados:', vehiculosData.length, vehiculosData);
       setVehiculos(vehiculosData);
     } catch (error) {
       console.error('Error al cargar vehículos:', error);
     }
   };
 
+  const actualizarEstadoCitas = async (citas) => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0); // Establecer a medianoche para comparación de fechas
+    
+    for (const cita of citas) {
+      const fechaCita = cita.fecha?.toDate ? cita.fecha.toDate() : new Date(cita.fecha);
+      fechaCita.setHours(0, 0, 0, 0);
+      
+      // Si la fecha de la cita ya pasó y no está completada o cancelada
+      if (fechaCita < hoy && !['completada', 'cancelada', 'vencida'].includes(cita.estado)) {
+        try {
+          let coleccion = 'citas';
+          if (cita.tipo === 'reciclaje') coleccion = 'citas_reciclaje';
+          if (cita.tipo === 'revision_tecnica') coleccion = 'revisiones_tecnicas';
+          if (cita.tipo === 'visita_reciclaje') coleccion = 'visitas_reciclaje';
+          
+          await updateDoc(doc(db, coleccion, cita.id), {
+            estado: 'vencida',
+            fechaActualizacion: new Date()
+          });
+          
+          console.log(`Cita ${cita.id} marcada como vencida`);
+        } catch (error) {
+          console.error(`Error actualizando cita ${cita.id}:`, error);
+        }
+      }
+    }
+  };
+
   const fetchCitas = async () => {
     try {
-      const citasQuery = query(
-        collection(db, 'citas'),
-        where('clienteId', '==', idCliente),
-        orderBy('fecha', 'desc'),
-        limit(10)
-      );
-      const citasSnapshot = await getDocs(citasQuery);
-      const citasData = citasSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setCitas(citasData);
+      const todasLasCitas = [];
+      
+      // Cargar citas generales
+      try {
+        const citasQuery = query(
+          collection(db, 'citas'),
+          where('clienteId', '==', idCliente),
+          orderBy('fecha', 'desc'),
+          limit(10)
+        );
+        const citasSnapshot = await getDocs(citasQuery);
+        const citasData = citasSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          tipo: 'general'
+        }));
+        todasLasCitas.push(...citasData);
+      } catch (error) {
+        console.log('Error cargando citas generales:', error);
+      }
+
+      // Cargar citas de reciclaje
+      try {
+        const reciclajeQuery = query(
+          collection(db, 'citas_reciclaje'),
+          where('clienteId', '==', idCliente),
+          orderBy('fecha', 'desc'),
+          limit(10)
+        );
+        const reciclajeSnapshot = await getDocs(reciclajeQuery);
+        const reciclajeData = reciclajeSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          tipo: 'reciclaje'
+        }));
+        todasLasCitas.push(...reciclajeData);
+      } catch (error) {
+        console.log('Error cargando citas de reciclaje:', error);
+      }
+
+      // Cargar visitas programadas de reciclaje
+      try {
+        console.log('🔍 Buscando visitas con idCliente:', idCliente);
+        console.log('🔍 Buscando visitas con user.uid:', user?.uid);
+        
+        // Intentar con ambos IDs por si acaso
+        const visitasReciclajeQuery = query(
+          collection(db, 'visitas_reciclaje'),
+          where('clienteId', '==', user?.uid || idCliente),
+          orderBy('fecha', 'desc'),
+          limit(10)
+        );
+        const visitasSnapshot = await getDocs(visitasReciclajeQuery);
+        const visitasData = visitasSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          tipo: 'visita_reciclaje'
+        }));
+        console.log('🔍 Visitas de reciclaje encontradas:', visitasData.length);
+        console.log('🔍 Datos de visitas:', visitasData);
+        todasLasCitas.push(...visitasData);
+      } catch (error) {
+        console.log('Error cargando visitas de reciclaje:', error);
+      }
+
+      // Cargar citas de revisión técnica
+      try {
+        const revisionQuery = query(
+          collection(db, 'revisiones_tecnicas'),
+          where('clienteId', '==', idCliente),
+          orderBy('fecha', 'desc'),
+          limit(10)
+        );
+        const revisionSnapshot = await getDocs(revisionQuery);
+        const revisionData = revisionSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          tipo: 'revision_tecnica'
+        }));
+        todasLasCitas.push(...revisionData);
+      } catch (error) {
+        console.log('Error cargando citas de revisión técnica:', error);
+      }
+
+      // Ordenar todas las citas por fecha
+      todasLasCitas.sort((a, b) => {
+        const fechaA = a.fecha?.toDate ? a.fecha.toDate() : new Date(a.fecha);
+        const fechaB = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
+        return fechaB - fechaA;
+      });
+
+      // Actualizar estado de citas vencidas
+      await actualizarEstadoCitas(todasLasCitas);
+
+      console.log('🔍 Total de citas cargadas:', todasLasCitas.length);
+      console.log('🔍 Tipos de citas:', todasLasCitas.map(c => c.tipo));
+      setCitas(todasLasCitas.slice(0, 10)); // Limitar a 10 citas
     } catch (error) {
       console.error('Error al cargar citas:', error);
     }
@@ -359,6 +518,13 @@ export default function DashboardClienteInterno() {
           descripcion: 'Un filtro de aire limpio mejora el rendimiento y consumo de combustible.',
           categoria: 'rendimiento',
           prioridad: 'baja'
+        },
+        {
+          id: 4,
+          titulo: 'Reciclaje de Componentes',
+          descripcion: 'Recicla aceites usados, filtros y baterías en centros especializados para cuidar el medio ambiente.',
+          categoria: 'reciclaje',
+          prioridad: 'media'
         }
       ];
       setConsejos(consejosData);
@@ -787,18 +953,6 @@ export default function DashboardClienteInterno() {
                 </button>
               </div>
               
-              <div className="mb-4">
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Puntos: {puntos || 0}</span>
-                  <span>{getProgressToNextLevel()?.target - (puntos || 0)} para {getProgressToNextLevel()?.nextLevel || 'máximo nivel'}</span>
-                </div>
-                <div className="w-full bg-white bg-opacity-20 rounded-full h-2">
-                  <div 
-                    className="bg-white h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${getProgressToNextLevel()?.percentage || 0}%` }}
-                  ></div>
-                </div>
-              </div>
               
               <div className="space-y-2">
                 {beneficios?.slice(0, 2).map((beneficio, index) => (
@@ -871,6 +1025,12 @@ export default function DashboardClienteInterno() {
                   💰 Gestión de Gastos
                 </button>
                 <button
+                  onClick={() => navigate('/dashboard/cliente/revision-tecnica')}
+                  className="w-full bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors"
+                >
+                  🔧 Revisión Técnica
+                </button>
+                <button
                   onClick={() => navigate('/empresas')}
                   className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
                 >
@@ -885,8 +1045,6 @@ export default function DashboardClienteInterno() {
               </div>
             </div>
 
-            {/* Simulador de Servicios (solo para testing) */}
-            <ServiceSimulator clienteId={idCliente} />
           </div>
 
           {/* Columna Central - Vehículos y Citas */}
@@ -958,6 +1116,82 @@ export default function DashboardClienteInterno() {
                 </div>
               </div>
               <div className="p-6">
+                {/* Debug: Mostrar cantidad de vehículos */}
+                <div className="mb-4 p-4 bg-yellow-100 text-yellow-800 text-sm rounded border-2 border-yellow-300">
+                  <div className="font-bold">🔍 DEBUG - Estado de Vehículos:</div>
+                  <div>Vehículos cargados: <span className="font-bold text-lg">{vehiculos.length}</span></div>
+                  <div>ID Cliente: {idCliente}</div>
+                  <div>Usuario autenticado: {user?.uid}</div>
+                  {vehiculos.length > 0 && (
+                    <div className="mt-2">
+                      <div className="font-bold">Vehículos encontrados:</div>
+                      {vehiculos.map((v, index) => (
+                        <div key={index} className="ml-2 text-xs">
+                          {index + 1}. {v.marca} {v.modelo} - {v.patente}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const vehiculoPrueba = {
+                          marca: 'Toyota',
+                          modelo: 'Corolla',
+                          año: '2020',
+                          patente: 'ABC123',
+                          kilometraje: '50000',
+                          tipo: 'auto',
+                          color: 'Blanco',
+                          combustible: 'gasolina',
+                          clienteId: idCliente,
+                          fechaCreacion: new Date(),
+                          estado: 'activo'
+                        };
+                        await addDoc(collection(db, 'vehiculos'), vehiculoPrueba);
+                        await fetchVehiculos();
+                        alert('Vehículo de prueba creado');
+                      } catch (error) {
+                        console.error('Error creando vehículo de prueba:', error);
+                      }
+                    }}
+                    className="ml-4 bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                  >
+                    Crear Vehículo de Prueba
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Buscar vehículo específico
+                        const vehiculoQuery = query(
+                          collection(db, 'vehiculos'),
+                          where('clienteId', '==', 'FwxoUCj90lhztH62YAdjckYbRPg2')
+                        );
+                        const snapshot = await getDocs(vehiculoQuery);
+                        console.log('🔍 Vehículos encontrados con ID específico:', snapshot.docs.length);
+                        snapshot.docs.forEach(doc => {
+                          console.log('🚗 Vehículo:', doc.id, doc.data());
+                        });
+                        
+                        // Buscar con el ID actual
+                        const vehiculoQueryActual = query(
+                          collection(db, 'vehiculos'),
+                          where('clienteId', '==', idCliente)
+                        );
+                        const snapshotActual = await getDocs(vehiculoQueryActual);
+                        console.log('🔍 Vehículos encontrados con ID actual:', snapshotActual.docs.length);
+                        snapshotActual.docs.forEach(doc => {
+                          console.log('🚗 Vehículo actual:', doc.id, doc.data());
+                        });
+                      } catch (error) {
+                        console.error('Error buscando vehículos:', error);
+                      }
+                    }}
+                    className="ml-2 bg-green-500 text-white px-2 py-1 rounded text-xs"
+                  >
+                    Buscar Vehículos
+                  </button>
+                </div>
                 {vehiculos.length === 0 ? (
                   <div className="text-center py-8">
                     <div className="text-gray-400 text-6xl mb-4">🚗</div>
@@ -971,7 +1205,9 @@ export default function DashboardClienteInterno() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {vehiculos.map((vehiculo) => (
+                    {vehiculos.map((vehiculo) => {
+                      console.log('🔍 Renderizando vehículo:', vehiculo.marca, vehiculo.modelo);
+                      return (
                       <div key={vehiculo.id} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -980,12 +1216,26 @@ export default function DashboardClienteInterno() {
                             </h4>
                             <p className="text-sm text-gray-600">{vehiculo.año} • {vehiculo.patente}</p>
                           </div>
-                          <button
-                            onClick={() => eliminarVehiculo(vehiculo.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => {
+                                console.log('🔍 Botón Perfil clickeado para vehículo:', vehiculo);
+                                setVehiculoSeleccionado(vehiculo);
+                                setShowPerfilVehiculoModal(true);
+                              }}
+                              className="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 font-medium"
+                              title="Ver perfil del vehículo"
+                            >
+                              📊 Perfil
+                            </button>
+                            <button
+                              onClick={() => eliminarVehiculo(vehiculo.id)}
+                              className="bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 font-medium"
+                              title="Eliminar vehículo"
+                            >
+                              🗑️ Eliminar
+                            </button>
+                          </div>
                         </div>
                         <div className="space-y-2 text-sm">
                           <div>
@@ -999,7 +1249,8 @@ export default function DashboardClienteInterno() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1009,7 +1260,13 @@ export default function DashboardClienteInterno() {
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Próximas Citas</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">📅 Próximas Citas</h3>
+                  <div className="flex space-x-2 text-sm text-gray-600">
+                    <span className="flex items-center"><span className="text-blue-500 mr-1">📅</span> General</span>
+                    <span className="flex items-center"><span className="text-green-500 mr-1">♻️</span> Reciclaje</span>
+                    <span className="flex items-center"><span className="text-orange-500 mr-1">🔧</span> Revisión</span>
+                  </div>
+                </div>
                   <button
                     onClick={() => setShowCitaModal(true)}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
@@ -1032,36 +1289,84 @@ export default function DashboardClienteInterno() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {citas.map((cita) => (
-                      <div key={cita.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{cita.servicio}</h4>
-                            <p className="text-sm text-gray-600">{cita.descripcion}</p>
-                            <p className="text-sm text-gray-500">
-                              {new Date(cita.fecha).toLocaleDateString()} a las {cita.hora}
-                            </p>
-                            {cita.empresaNombre && (
-                              <p className="text-sm text-blue-600">{cita.empresaNombre}</p>
-                            )}
+                    {citas.map((cita) => {
+                      const getTipoInfo = (tipo) => {
+                        switch (tipo) {
+                          case 'reciclaje':
+                            return { icon: '♻️', color: 'green', label: 'Reciclaje' };
+                          case 'visita_reciclaje':
+                            return { icon: '♻️', color: 'green', label: 'Visita Reciclaje' };
+                          case 'revision_tecnica':
+                            return { icon: '🔧', color: 'orange', label: 'Revisión Técnica' };
+                          default:
+                            return { icon: '📅', color: 'blue', label: 'Cita General' };
+                        }
+                      };
+
+                      const tipoInfo = getTipoInfo(cita.tipo);
+                      const fecha = cita.fecha?.toDate ? cita.fecha.toDate() : new Date(cita.fecha);
+                      
+                      return (
+                        <div key={cita.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <span className="text-lg">{tipoInfo.icon}</span>
+                              <h4 className="font-semibold text-gray-900">
+                                {cita.servicio || cita.tipoRevision || (cita.tipo === 'visita_reciclaje' ? 'Visita de Reciclaje' : 'Servicio')}
+                              </h4>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium bg-${tipoInfo.color}-100 text-${tipoInfo.color}-800`}>
+                                  {tipoInfo.label}
+                                </span>
+                              </div>
+                              
+                              <p className="text-sm text-gray-600 mb-2">
+                                {cita.descripcion || cita.observaciones || cita.notas || (cita.tipo === 'visita_reciclaje' ? 'Visita programada para recolección de materiales reciclables' : 'Sin descripción')}
+                              </p>
+                              
+                              <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                <span>📅 {fecha.toLocaleDateString()}</span>
+                                {cita.hora && <span>🕐 {cita.hora}</span>}
+                              </div>
+                              
+                              {cita.empresaNombre && (
+                                <p className="text-sm text-blue-600 mt-1">🏢 {cita.empresaNombre}</p>
+                              )}
+                              
+                              {cita.centro && (
+                                <p className="text-sm text-orange-600 mt-1">🏢 {cita.centro.nombre}</p>
+                              )}
+                              
+                              {cita.vehiculo && (
+                                <p className="text-sm text-gray-600 mt-1">🚗 {cita.vehiculo.marca} {cita.vehiculo.modelo}</p>
+                              )}
+                              
+                              {cita.tipo === 'visita_reciclaje' && cita.direccion && (
+                                <p className="text-sm text-gray-600 mt-1">📍 {cita.direccion}</p>
+                              )}
+                            </div>
+                            
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              cita.estado === 'confirmada' || cita.estado === 'aprobada' ? 'bg-green-100 text-green-800' :
+                              cita.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                              cita.estado === 'rechazada' ? 'bg-red-100 text-red-800' :
+                              cita.estado === 'vencida' ? 'bg-red-200 text-red-900' :
+                              cita.estado === 'completada' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {cita.estado || 'Pendiente'}
+                            </span>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            cita.estado === 'confirmada' ? 'bg-green-100 text-green-800' :
-                            cita.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {cita.estado}
-                          </span>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
 
-                         {/* Empresas Recomendadas */}
-             {vehiculos.length > 0 && (
+            {/* Empresas Recomendadas */}
+            {vehiculos.length > 0 && (
                <div className="bg-white rounded-lg shadow">
                  <div className="px-6 py-4 border-b border-gray-200">
                    <h3 className="text-lg font-semibold text-gray-900">🏢 Talleres Recomendados</h3>
@@ -1272,7 +1577,6 @@ export default function DashboardClienteInterno() {
              </div>
           </div>
         </div>
-      </div>
 
       {/* Modal Agregar Vehículo */}
       {showVehiculoModal && (
@@ -1438,6 +1742,9 @@ export default function DashboardClienteInterno() {
                   <option value="alineacion">Alineación</option>
                   <option value="frenos">Sistema de Frenos</option>
                   <option value="electrico">Sistema Eléctrico</option>
+                  <option value="reciclaje">Reciclaje</option>
+                  <option value="revision_tecnica">Revisión Técnica</option>
+                  {/* Opciones actualizadas */}
                 </select>
               </div>
               <div>
@@ -1660,6 +1967,17 @@ export default function DashboardClienteInterno() {
             <GestionGastosVehiculo clienteId={idCliente} />
           </div>
         </div>
+      )}
+
+      {/* Modal de Perfil del Vehículo */}
+      {showPerfilVehiculoModal && vehiculoSeleccionado && (
+        <PerfilVehiculo
+          vehiculo={vehiculoSeleccionado}
+          onClose={() => {
+            setShowPerfilVehiculoModal(false);
+            setVehiculoSeleccionado(null);
+          }}
+        />
       )}
 
       {/* Botón de Debug AuthProvider */}

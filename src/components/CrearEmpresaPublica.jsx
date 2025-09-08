@@ -4,6 +4,7 @@ import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function CrearEmpresaPublica({ onClose, onSuccess }) {
+  console.log('🚀 CrearEmpresaPublica - VERSIÓN MEJORADA se está cargando');
   const [formData, setFormData] = useState({
     nombre: '',
     direccion: '',
@@ -38,6 +39,47 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
   const [logoUploaded, setLogoUploaded] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState('');
+  
+  // Servicios principales predefinidos
+  const [serviciosPredefinidos] = useState([
+    { 
+      id: 'revision_tecnica', 
+      nombre: 'Revisión Técnica', 
+      icono: '🔧', 
+      color: 'blue',
+      descripcion: 'Inspección técnica vehicular obligatoria',
+      destacado: true
+    },
+    { 
+      id: 'mecanica_general', 
+      nombre: 'Mecánica General', 
+      icono: '⚙️', 
+      color: 'green',
+      descripcion: 'Reparación y mantenimiento general de vehículos',
+      destacado: true
+    },
+    { 
+      id: 'vulcanizacion', 
+      nombre: 'Vulcanización', 
+      icono: '🛞', 
+      color: 'purple',
+      descripcion: 'Reparación y reconstrucción de neumáticos',
+      destacado: true
+    }
+  ]);
+
+  // Servicios adicionales
+  const [serviciosAdicionales] = useState([
+    { id: 'neumaticos', nombre: 'Neumáticos', icono: '🚗', color: 'red' },
+    { id: 'frenos', nombre: 'Frenos', icono: '🛑', color: 'orange' },
+    { id: 'suspension', nombre: 'Suspensión', icono: '🔩', color: 'indigo' },
+    { id: 'motor', nombre: 'Motor', icono: '🔋', color: 'yellow' },
+    { id: 'electricidad', nombre: 'Electricidad', icono: '⚡', color: 'pink' },
+    { id: 'aire_acondicionado', nombre: 'Aire Acondicionado', icono: '❄️', color: 'cyan' }
+  ]);
+  
+  const [servicioPersonalizado, setServicioPersonalizado] = useState('');
+  const [serviciosPersonalizados, setServiciosPersonalizados] = useState([]);
 
   useEffect(() => {
     cargarCategorias();
@@ -131,6 +173,45 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
       categorias: prev.categorias.includes(categoriaNombre) 
         ? prev.categorias.filter(nombre => nombre !== categoriaNombre)
         : [...prev.categorias, categoriaNombre]
+    }));
+  };
+
+  // Funciones para servicios personalizados
+  const agregarServicioPersonalizado = () => {
+    if (servicioPersonalizado.trim() && !serviciosPersonalizados.includes(servicioPersonalizado.trim())) {
+      const nuevoServicio = servicioPersonalizado.trim();
+      setServiciosPersonalizados(prev => [...prev, nuevoServicio]);
+      setFormData(prev => ({
+        ...prev,
+        categorias: [...prev.categorias, nuevoServicio]
+      }));
+      setServicioPersonalizado('');
+    }
+  };
+
+  const eliminarServicioPersonalizado = (servicio) => {
+    setServiciosPersonalizados(prev => prev.filter(s => s !== servicio));
+    setFormData(prev => ({
+      ...prev,
+      categorias: prev.categorias.filter(cat => cat !== servicio)
+    }));
+  };
+
+  const handleServicioPredefinidoChange = (servicio) => {
+    setFormData(prev => ({
+      ...prev,
+      categorias: prev.categorias.includes(servicio) 
+        ? prev.categorias.filter(s => s !== servicio)
+        : [...prev.categorias, servicio]
+    }));
+  };
+
+  const handleServicioAdicionalChange = (servicio) => {
+    setFormData(prev => ({
+      ...prev,
+      categorias: prev.categorias.includes(servicio) 
+        ? prev.categorias.filter(s => s !== servicio)
+        : [...prev.categorias, servicio]
     }));
   };
 
@@ -290,26 +371,52 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Crear Empresa Pública</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
-          >
-            ×
-          </button>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden">
+        {/* Header mejorado */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                <span className="text-2xl">🏢</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Crear Empresa Pública</h2>
+                <p className="text-blue-100 text-sm">Registra una nueva empresa en el directorio</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg flex items-center justify-center transition-all duration-200"
+            >
+              <span className="text-xl font-bold">×</span>
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Información Básica */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Información Básica</h3>
+        {/* Contenido con scroll */}
+        <div className="overflow-y-auto max-h-[calc(95vh-120px)]">
+          <div className="p-6">
+            {/* Banner de verificación temporal */}
+            <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-4 rounded-xl mb-6 text-center">
+              <h3 className="text-lg font-bold">✅ VERSIÓN MEJORADA CARGADA</h3>
+              <p className="text-sm">Diseño renovado con servicios destacados</p>
+            </div>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Información Básica */}
+          <div className="bg-gray-50 rounded-xl p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600 text-lg">ℹ️</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800">Información Básica</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Nombre de la Empresa *
                 </label>
                 <input
@@ -317,13 +424,14 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                   name="nombre"
                   value={formData.nombre}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  placeholder="Ej: Taller Automotriz San Miguel"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Dirección *
                 </label>
                 <input
@@ -331,13 +439,14 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                   name="direccion"
                   value={formData.direccion}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  placeholder="Calle, número, comuna, región"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Teléfono
                 </label>
                 <input
@@ -345,12 +454,13 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                   name="telefono"
                   value={formData.telefono}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  placeholder="+56 9 1234 5678"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Email
                 </label>
                 <input
@@ -358,17 +468,27 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  placeholder="contacto@empresa.com"
                 />
               </div>
             </div>
 
-            {/* Información de Negocio */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-700 border-b pb-2">Información de Negocio</h3>
+          </div>
+
+          {/* Información de Negocio */}
+          <div className="bg-gray-50 rounded-xl p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600 text-lg">🌐</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800">Información de Negocio</h3>
+            </div>
+            
+            <div className="space-y-6">
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
                   Sitio Web *
                 </label>
                 <input
@@ -376,42 +496,72 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                   name="sitio_web"
                   value={formData.sitio_web}
                   onChange={handleChange}
-                  placeholder="https://ejemplo.com"
-                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="https://www.empresa.com"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Descripción de la Empresa
+                </label>
+                <textarea
+                  name="descripcion"
+                  value={formData.descripcion}
+                  onChange={handleChange}
+                  rows="4"
+                  className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white resize-none"
+                  placeholder="Describe los servicios que ofrece tu empresa, años de experiencia, especialidades, etc..."
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-700">
                   Logo de la Empresa
                 </label>
                 
-                {/* Input para archivo */}
-                <div className="mb-3">
+                {/* Input para archivo mejorado */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleLogoChange}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="hidden"
+                    id="logo-upload"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Formatos: JPG, PNG, GIF. Máximo 5MB
-                  </p>
+                  <label htmlFor="logo-upload" className="cursor-pointer">
+                    <div className="text-gray-400 mb-2">
+                      <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-gray-600 font-medium">Haz clic para subir logo</p>
+                    <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF • Máximo 5MB</p>
+                  </label>
                 </div>
 
-                {/* Preview del logo */}
+                {/* Preview del logo mejorado */}
                 {logoPreview && (
-                  <div className="mb-3">
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src={logoPreview} 
-                        alt="Preview del logo" 
-                        className="h-20 w-20 object-contain border border-gray-300 rounded"
-                      />
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <img 
+                          src={logoPreview} 
+                          alt="Preview del logo" 
+                          className="h-24 w-24 object-contain border border-gray-200 rounded-lg"
+                        />
+                        {logoUploading && (
+                          <div className="absolute inset-0 bg-white bg-opacity-75 rounded-lg flex items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        )}
+                      </div>
                       
                       {/* Estado del logo */}
                       <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2">Vista previa del logo</h4>
+                        
                         {logoUploading && (
                           <div className="flex items-center gap-2 text-blue-600">
                             <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -530,33 +680,175 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Servicios *
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-gray-300 rounded-md bg-gray-50">
-                  {categorias.map(categoria => (
-                    <label key={categoria.id} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.categorias.includes(categoria.nombre)}
-                        onChange={() => handleCategoriaChange(categoria.nombre)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{categoria.nombre}</span>
-                    </label>
-                  ))}
+          {/* Servicios */}
+          <div className="bg-gray-50 rounded-xl p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600 text-lg">⚙️</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-800">Servicios que Ofrece *</h3>
+            </div>
+                
+                {/* Servicios Principales - Destacados */}
+                <div className="mb-8">
+                  <div className="flex items-center mb-4">
+                    <h4 className="text-lg font-semibold text-gray-700">Servicios Principales</h4>
+                    <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">Recomendados</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {serviciosPredefinidos.map(servicio => (
+                      <label 
+                        key={servicio.id} 
+                        className={`group relative flex flex-col items-center p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-105 ${
+                          formData.categorias.includes(servicio.nombre)
+                            ? `border-${servicio.color}-500 bg-${servicio.color}-50 shadow-md`
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.categorias.includes(servicio.nombre)}
+                          onChange={() => handleServicioPredefinidoChange(servicio.nombre)}
+                          className="sr-only"
+                        />
+                        <div className="text-4xl mb-3">{servicio.icono}</div>
+                        <h5 className="text-lg font-semibold text-gray-800 mb-2 text-center">
+                          {servicio.nombre}
+                        </h5>
+                        <p className="text-sm text-gray-600 text-center leading-relaxed">
+                          {servicio.descripcion}
+                        </p>
+                        {formData.categorias.includes(servicio.nombre) && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm">✓</span>
+                            </div>
+                          </div>
+                        )}
+                      </label>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Servicios Adicionales */}
+                <div className="mb-8">
+                  <h4 className="text-lg font-semibold text-gray-700 mb-4">Otros Servicios</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    {serviciosAdicionales.map(servicio => (
+                      <label 
+                        key={servicio.id} 
+                        className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                          formData.categorias.includes(servicio.nombre)
+                            ? `border-${servicio.color}-500 bg-${servicio.color}-50`
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.categorias.includes(servicio.nombre)}
+                          onChange={() => handleServicioAdicionalChange(servicio.nombre)}
+                          className="sr-only"
+                        />
+                        <div className="text-2xl mb-2">{servicio.icono}</div>
+                        <span className="text-sm font-medium text-gray-700 text-center">
+                          {servicio.nombre}
+                        </span>
+                        {formData.categorias.includes(servicio.nombre) && (
+                          <div className="mt-2">
+                            <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs">✓</span>
+                            </div>
+                          </div>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Servicios Personalizados */}
+                <div className="mb-6">
+                  <h4 className="text-lg font-semibold text-gray-700 mb-4">Agregar Servicio Personalizado</h4>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex space-x-3">
+                      <input
+                        type="text"
+                        value={servicioPersonalizado}
+                        onChange={(e) => setServicioPersonalizado(e.target.value)}
+                        placeholder="Ej: Alineación y balanceo, Reparación de aire acondicionado..."
+                        className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onKeyPress={(e) => e.key === 'Enter' && agregarServicioPersonalizado()}
+                      />
+                      <button
+                        type="button"
+                        onClick={agregarServicioPersonalizado}
+                        disabled={!servicioPersonalizado.trim()}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                      >
+                        Agregar
+                      </button>
+                    </div>
+                    
+                    {/* Lista de servicios personalizados */}
+                    {serviciosPersonalizados.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-600 mb-3">Servicios personalizados agregados:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {serviciosPersonalizados.map(servicio => (
+                            <span 
+                              key={servicio} 
+                              className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm flex items-center space-x-2 font-medium"
+                            >
+                              <span>{servicio}</span>
+                              <button
+                                type="button"
+                                onClick={() => eliminarServicioPersonalizado(servicio)}
+                                className="text-purple-600 hover:text-purple-800 ml-1 font-bold"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Validación y resumen */}
                 {formData.categorias.length === 0 && (
-                  <p className="text-sm text-red-600 mt-1">Debes seleccionar al menos un servicio</p>
+                  <div className="bg-red-50 border-l-4 border-red-400 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <div className="text-red-400 mr-3">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-red-700 font-medium">
+                        Debes seleccionar al menos un servicio para continuar
+                      </p>
+                    </div>
+                  </div>
                 )}
+                
                 {formData.categorias.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-600 mb-2">Servicios seleccionados:</p>
+                  <div className="bg-green-50 border-l-4 border-green-400 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <div className="text-green-400 mr-3">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-green-700 font-medium">
+                        Servicios seleccionados ({formData.categorias.length})
+                      </p>
+                    </div>
                     <div className="flex flex-wrap gap-2">
-                      {formData.categorias.map(catNombre => (
-                        <span key={catNombre} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                          {catNombre}
+                      {formData.categorias.map(servicio => (
+                        <span 
+                          key={servicio} 
+                          className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium"
+                        >
+                          {servicio}
                         </span>
                       ))}
                     </div>
@@ -646,22 +938,34 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Botones */}
-          <div className="flex justify-end space-x-4 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || (logoFile && !logoUploaded)}
-              className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-medium text-lg shadow-lg"
-            >
-              {loading ? '⏳ Creando...' : '💾 Guardar Empresa'}
-            </button>
+          {/* Botones de acción mejorados */}
+          <div className="bg-white border-t border-gray-200 p-6">
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-8 py-3 border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all duration-200 font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || (logoFile && !logoUploaded)}
+                className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Creando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>💾</span>
+                    <span>Guardar Empresa</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           
           {/* Aviso sobre el logo */}
@@ -676,6 +980,8 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
             </div>
           )}
         </form>
+          </div>
+        </div>
       </div>
     </div>
   );

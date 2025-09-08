@@ -4,6 +4,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import EmpresaDetalleAgente from "./components/EmpresaDetalleAgente";
+import AnalyticsService from "./services/AnalyticsService";
 
 // Providers
 import AuthProvider from "./components/AuthProvider";
@@ -26,19 +27,21 @@ import RegistroAgente from "./components/RegistroAgente";
 import RegistroEmpresa from "./components/RegistroEmpresa";
 import SolicitudComunidad from "./components/SolicitudComunidad";
 import PymesLocalesPage from "./pages/PymesLocalesPage";
+import ProveedoresPage from "./pages/ProveedoresPage";
 import AreaClientePage from "./pages/AreaClientePage";
 import FAQPage from "./pages/FAQPage";
 import EducationalResourcesPage from "./pages/EducationalResourcesPage";
 import ResourceDetailPage from "./pages/ResourceDetailPage";
 import ContactPage from "./pages/ContactPage";
 import SegurosPage from "./pages/SegurosPage";
-import RevisionTecnicaPage from "./pages/RevisionTecnicaPage";
 import VulcanizacionesPage from "./pages/VulcanizacionesPage";
 import ReciclajePage from "./pages/ReciclajePage";
 import DashboardReciclajeCliente from "./pages/DashboardReciclajeCliente";
 import DashboardReciclajeProveedor from "./pages/DashboardReciclajeProveedor";
 import RegistroEmpresaReciclaje from "./pages/RegistroEmpresaReciclaje";
 import RecordatoriosPage from "./pages/RecordatoriosPage";
+import RevisionTecnicaClientePage from "./pages/RevisionTecnicaClientePage";
+import ServiciosRevisionTecnicaPage from "./pages/ServiciosRevisionTecnicaPage";
 import MasInformacionProveedorPage from "./pages/MasInformacionProveedorPage";
 import PerfilEmpresaPublica from "./pages/PerfilEmpresaPublica";
 import DashboardProveedorInterno from "./pages/DashboardProveedorInterno";
@@ -70,6 +73,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Inicializar Analytics
+    AnalyticsService.initialize();
+    
     // Inicializar datos de servicio si es necesario
     initializeServiceData();
     // Inicializar datos de reciclaje si es necesario
@@ -79,6 +85,9 @@ function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setActiveUser(user);
       if (user) {
+        // Trackear login
+        AnalyticsService.trackUserLogin('user', 'email');
+        
         // Escuchar datos del usuario en Firestore
         const userDocRef = collection(db, "usuarios");
         const unsubscribeUserData = onSnapshot(userDocRef, (snapshot) => {
@@ -90,6 +99,8 @@ function App() {
 
         return () => unsubscribeUserData();
       } else {
+        // Trackear logout
+        AnalyticsService.trackUserLogout('user');
         setUserData(null);
         setIsLoading(false);
       }
@@ -199,7 +210,7 @@ function App() {
             <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />
             {/* Páginas públicas de empresas */}
             <Route path="/empresas" element={<PymesLocalesPage />} />
-            <Route path="/proveedores" element={<PymesLocalesPage />} />
+            <Route path="/proveedores" element={<ProveedoresPage />} />
             <Route path="/proveedores-locales" element={<PymesLocalesPage />} />
             <Route path="/empresas-locales" element={<PymesLocalesPage />} />
             <Route path="/area-cliente" element={<AreaClientePage />} />
@@ -211,13 +222,14 @@ function App() {
             
             {/* Rutas de servicios automotrices */}
             <Route path="/servicios/seguros" element={<SegurosPage />} />
-            <Route path="/servicios/revision-tecnica" element={<RevisionTecnicaPage />} />
+            <Route path="/servicios/revision-tecnica" element={<ServiciosRevisionTecnicaPage />} />
             <Route path="/servicios/vulcanizaciones" element={<VulcanizacionesPage />} />
             <Route path="/servicios/reciclaje" element={<ReciclajePage />} />
         <Route path="/dashboard/reciclaje/cliente" element={<DashboardReciclajeCliente />} />
         <Route path="/dashboard/reciclaje/proveedor" element={<DashboardReciclajeProveedor />} />
         <Route path="/registro/empresa/reciclaje" element={<RegistroEmpresaReciclaje />} />
             <Route path="/mis-recordatorios" element={<RecordatoriosPage />} />
+            <Route path="/dashboard/cliente/revision-tecnica" element={<RevisionTecnicaClientePage />} />
             
             {/* Perfil público de empresa */}
             <Route path="/empresa/:id" element={<PerfilEmpresaPublica />} />

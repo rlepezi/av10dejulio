@@ -1,5 +1,6 @@
 // Servicio de Pagos y Suscripciones AV 10 de Julio
 // Basado en el documento del proyecto - Monetización
+// Integrado con Stripe para pagos reales
 
 import { 
   collection, 
@@ -17,6 +18,7 @@ import {
   arrayRemove
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import StripeService from './StripeService';
 
 export class PaymentService {
   
@@ -69,10 +71,28 @@ export class PaymentService {
   };
 
   /**
-   * Crear nueva suscripción
+   * Crear nueva suscripción con Stripe
    */
   static async createSubscription(userId, planData, paymentData) {
     try {
+      // Si es un plan gratuito, crear directamente en Firestore
+      if (planData.price === 0) {
+        return await this.createFreeSubscription(userId, planData);
+      }
+
+      // Para planes de pago, usar Stripe
+      const stripeResult = await StripeService.createSubscription(
+        planData.id,
+        userId,
+        paymentData.userType || 'client',
+        paymentData.paymentMethodId
+      );
+
+      if (!stripeResult.success) {
+        return { success: false, error: stripeResult.error };
+      }
+
+      // Crear registro en Firestore
       const suscripcion = {
         userId,
         planId: planData.id,
@@ -89,25 +109,64 @@ export class PaymentService {
         beneficios: planData.features || [],
         limitaciones: planData.limitations || {},
         trialDays: planData.trialDays || 0,
-        esTrial: planData.trialDays > 0
+        esTrial: planData.trialDays > 0,
+        stripeSubscriptionId: stripeResult.subscriptionId,
+        stripeCustomerId: stripeResult.customerId
       };
 
       const docRef = await addDoc(collection(db, 'suscripciones'), suscripcion);
-      console.log('✅ Suscripción creada:', docRef.id);
+      console.log('✅ Suscripción creada con Stripe:', docRef.id);
       
-      // Crear primer pago
-      await this.createPayment(docRef.id, {
-        monto: planData.price,
-        moneda: planData.currency || 'CLP',
-        tipo: this.PAYMENT_TYPES.SUBSCRIPTION,
-        metodo: paymentData.paymentMethod,
-        datos: paymentData.paymentDetails,
-        descripcion: `Suscripción ${planData.name}`
+      // Registrar transacción en Firestore
+      await StripeService.recordTransaction({
+        userId,
+        userType: paymentData.userType || 'client',
+        planId: planData.id,
+        amount: planData.price,
+        currency: planData.currency || 'CLP',
+        type: 'subscription',
+        subscriptionId: stripeResult.subscriptionId,
+        status: 'completed'
       });
 
-      return { success: true, id: docRef.id };
+      return { success: true, id: docRef.id, stripeSubscriptionId: stripeResult.subscriptionId };
     } catch (error) {
       console.error('❌ Error creando suscripción:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Crear suscripción gratuita
+   */
+  static async createFreeSubscription(userId, planData) {
+    try {
+      const suscripcion = {
+        userId,
+        planId: planData.id,
+        planName: planData.name,
+        precio: 0,
+        moneda: 'CLP',
+        cicloFacturacion: this.BILLING_CYCLES.MONTHLY,
+        fechaInicio: serverTimestamp(),
+        fechaProximoPago: null, // Plan gratuito no expira
+        estado: this.SUBSCRIPTION_STATUS.ACTIVE,
+        metodoPago: 'gratuito',
+        datosPago: {},
+        historialPagos: [],
+        beneficios: planData.features || [],
+        limitaciones: planData.limitations || {},
+        trialDays: 0,
+        esTrial: false,
+        esGratuito: true
+      };
+
+      const docRef = await addDoc(collection(db, 'suscripciones'), suscripcion);
+      console.log('✅ Suscripción gratuita creada:', docRef.id);
+      
+      return { success: true, id: docRef.id };
+    } catch (error) {
+      console.error('❌ Error creando suscripción gratuita:', error);
       return { success: false, error: error.message };
     }
   }

@@ -27,6 +27,7 @@ import ResourceManager from "./ResourceManager";
 import EditarEmpresaAdmin from "./EditarEmpresaAdmin";
 import ListadoProveedoresAdmin from "./ListadoProveedoresAdmin";
 import CrearEmpresaPublicaPage from "./CrearEmpresaPublicaPage";
+import CrearEmpresaPage from "../pages/CrearEmpresaPage";
 
 // Servicios
 import ServicioSeguros from "./ServicioSeguros";
@@ -51,6 +52,7 @@ export default function AdminLayout() {
         
         {/* Administración */}
         <Route path="empresas" element={<GestionEmpresas />} />
+        <Route path="crear-empresa" element={<CrearEmpresaPublicaPage />} />
         <Route path="crear-empresa-publica" element={<CrearEmpresaPublicaPage />} />
         <Route path="editar-empresa/:empresaId" element={<EditarEmpresaAdmin />} />
         <Route path="editar-solicitud" element={<EditarSolicitud />} />

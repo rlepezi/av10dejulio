@@ -164,6 +164,18 @@ self.addEventListener('fetch', event => {
         
         // Intentar hacer fetch con manejo de errores
         return fetch(event.request)
+          .then(fetchResponse => {
+            // Si el fetch es exitoso, cachear la respuesta
+            if (fetchResponse && fetchResponse.status === 200) {
+              const responseToCache = fetchResponse.clone();
+              caches.open('av10dejulio-cache-v1')
+                .then(cache => {
+                  cache.put(event.request, responseToCache);
+                })
+                .catch(err => console.log('Error cacheando:', err));
+            }
+            return fetchResponse;
+          })
           .catch(error => {
             console.log('Fetch falló para:', event.request.url, error);
             // Si es una solicitud de página, devolver una página de error básica
@@ -173,9 +185,20 @@ self.addEventListener('fetch', event => {
                 { headers: { 'Content-Type': 'text/html' } }
               );
             }
-            // Para otros recursos, devolver un error
-            throw error;
+            // Para otros recursos, devolver un error 404
+            return new Response('Recurso no encontrado', { 
+              status: 404, 
+              statusText: 'Not Found' 
+            });
           });
+      })
+      .catch(error => {
+        console.error('Error en service worker:', error);
+        // Devolver una respuesta de error genérica
+        return new Response('Error del servicio', { 
+          status: 500, 
+          statusText: 'Internal Server Error' 
+        });
       })
   );
 });

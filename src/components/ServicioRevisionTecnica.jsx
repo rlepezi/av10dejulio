@@ -12,6 +12,18 @@ export default function ServicioRevisionTecnica() {
   const [activeTab, setActiveTab] = useState('agendar');
   const [showModal, setShowModal] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState(null);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [editingCentro, setEditingCentro] = useState(null);
+  const [adminForm, setAdminForm] = useState({
+    nombre: '',
+    region: '',
+    comuna: '',
+    direccion: '',
+    paginaWeb: '',
+    horario: '',
+    telefono: '',
+    email: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -67,6 +79,83 @@ export default function ServicioRevisionTecnica() {
     } catch (error) {
       console.error('Error scheduling revision:', error);
     }
+  };
+
+  const agregarCentro = async (e) => {
+    e.preventDefault();
+    try {
+      const centroData = {
+        ...adminForm,
+        fechaCreacion: new Date(),
+        activo: true,
+        rating: 0,
+        totalCalificaciones: 0
+      };
+
+      await addDoc(collection(db, 'centros_revision'), centroData);
+      await loadData();
+      setShowAdminModal(false);
+      setAdminForm({
+        nombre: '',
+        region: '',
+        comuna: '',
+        direccion: '',
+        paginaWeb: '',
+        horario: '',
+        telefono: '',
+        email: ''
+      });
+    } catch (error) {
+      console.error('Error adding center:', error);
+    }
+  };
+
+  const editarCentro = async (e) => {
+    e.preventDefault();
+    try {
+      await updateDoc(doc(db, 'centros_revision', editingCentro.id), adminForm);
+      await loadData();
+      setShowAdminModal(false);
+      setEditingCentro(null);
+      setAdminForm({
+        nombre: '',
+        region: '',
+        comuna: '',
+        direccion: '',
+        paginaWeb: '',
+        horario: '',
+        telefono: '',
+        email: ''
+      });
+    } catch (error) {
+      console.error('Error updating center:', error);
+    }
+  };
+
+  const eliminarCentro = async (centroId) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar este centro?')) {
+      try {
+        await updateDoc(doc(db, 'centros_revision', centroId), { activo: false });
+        await loadData();
+      } catch (error) {
+        console.error('Error deleting center:', error);
+      }
+    }
+  };
+
+  const abrirModalEdicion = (centro) => {
+    setEditingCentro(centro);
+    setAdminForm({
+      nombre: centro.nombre || '',
+      region: centro.region || '',
+      comuna: centro.comuna || '',
+      direccion: centro.direccion || '',
+      paginaWeb: centro.paginaWeb || '',
+      horario: centro.horario || '',
+      telefono: centro.telefono || '',
+      email: centro.email || ''
+    });
+    setShowAdminModal(true);
   };
 
   const calcularVencimiento = (ultimaRevision) => {
@@ -400,7 +489,236 @@ export default function ServicioRevisionTecnica() {
             </div>
           </div>
         )}
+
+        {activeTab === 'admin' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Administración de Centros de Revisión Técnica</h3>
+              <button
+                onClick={() => {
+                  setEditingCentro(null);
+                  setAdminForm({
+                    nombre: '',
+                    region: '',
+                    comuna: '',
+                    direccion: '',
+                    paginaWeb: '',
+                    horario: '',
+                    telefono: '',
+                    email: ''
+                  });
+                  setShowAdminModal(true);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                + Agregar Centro
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              {centrosRevision.filter(centro => centro.activo !== false).map(centro => (
+                <div key={centro.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-lg">{centro.nombre}</h4>
+                      <div className="grid md:grid-cols-2 gap-2 mt-2 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">📍 Dirección:</span>
+                          <p>{centro.direccion}, {centro.comuna}, {centro.region}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium">🕒 Horario:</span>
+                          <p>{centro.horario || 'No especificado'}</p>
+                        </div>
+                        {centro.paginaWeb && (
+                          <div>
+                            <span className="font-medium">🌐 Web:</span>
+                            <a href={centro.paginaWeb} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {centro.paginaWeb}
+                            </a>
+                          </div>
+                        )}
+                        {centro.telefono && (
+                          <div>
+                            <span className="font-medium">📞 Teléfono:</span>
+                            <p>{centro.telefono}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => abrirModalEdicion(centro)}
+                        className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => eliminarCentro(centro.id)}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal de administración */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingCentro ? 'Editar Centro' : 'Agregar Nuevo Centro'}
+            </h3>
+            
+            <form onSubmit={editingCentro ? editarCentro : agregarCentro} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nombre del Centro *</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.nombre}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, nombre: e.target.value }))}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Región *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.region}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, region: e.target.value }))}
+                    required
+                  >
+                    <option value="">Seleccionar región</option>
+                    <option value="Metropolitana">Metropolitana</option>
+                    <option value="Valparaíso">Valparaíso</option>
+                    <option value="Biobío">Biobío</option>
+                    <option value="La Araucanía">La Araucanía</option>
+                    <option value="Los Lagos">Los Lagos</option>
+                    <option value="Antofagasta">Antofagasta</option>
+                    <option value="Atacama">Atacama</option>
+                    <option value="Coquimbo">Coquimbo</option>
+                    <option value="O'Higgins">O'Higgins</option>
+                    <option value="Maule">Maule</option>
+                    <option value="Ñuble">Ñuble</option>
+                    <option value="Los Ríos">Los Ríos</option>
+                    <option value="Aysén">Aysén</option>
+                    <option value="Magallanes">Magallanes</option>
+                    <option value="Arica y Parinacota">Arica y Parinacota</option>
+                    <option value="Tarapacá">Tarapacá</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Comuna *</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.comuna}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, comuna: e.target.value }))}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Teléfono</label>
+                  <input
+                    type="tel"
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.telefono}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, telefono: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Dirección *</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2"
+                  value={adminForm.direccion}
+                  onChange={(e) => setAdminForm(prev => ({ ...prev, direccion: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Página Web</label>
+                  <input
+                    type="url"
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.paginaWeb}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, paginaWeb: e.target.value }))}
+                    placeholder="https://ejemplo.com"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    type="email"
+                    className="w-full border rounded px-3 py-2"
+                    value={adminForm.email}
+                    onChange={(e) => setAdminForm(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Horario de Atención *</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2"
+                  value={adminForm.horario}
+                  onChange={(e) => setAdminForm(prev => ({ ...prev, horario: e.target.value }))}
+                  placeholder="Ej: L-V 8:00-18:00, S 8:00-14:00"
+                  required
+                />
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-50"
+                  onClick={() => {
+                    setShowAdminModal(false);
+                    setEditingCentro(null);
+                    setAdminForm({
+                      nombre: '',
+                      region: '',
+                      comuna: '',
+                      direccion: '',
+                      paginaWeb: '',
+                      horario: '',
+                      telefono: '',
+                      email: ''
+                    });
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+                >
+                  {editingCentro ? 'Actualizar' : 'Agregar'} Centro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de agendamiento */}
       {showModal && selectedCentro && (
