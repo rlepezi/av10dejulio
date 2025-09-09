@@ -124,12 +124,19 @@ const HomePage = () => {
   useEffect(() => {
     let filtered = [...empresasActivas];
     
+    // Excluir empresas de revisión técnica del Home
+    filtered = filtered.filter(empresa => 
+      empresa.tipoServicio !== 'revision_tecnica' && 
+      !empresa.categorias?.includes('Revisión Técnica')
+    );
+    
     if (filtroTipoEmpresa) {
       filtered = filtered.filter(empresa => (empresa.tipoEmpresa || '').toLowerCase() === filtroTipoEmpresa.toLowerCase());
     }
     
     console.log('🔍 Empresas después del filtro:', filtered.length);
     console.log('📋 Filtro actual:', filtroTipoEmpresa || 'Sin filtro');
+    console.log('🚫 Empresas de revisión técnica excluidas del Home');
     
     setEmpresasFiltradas(filtered);
   }, [empresasActivas, filtroTipoEmpresa]);

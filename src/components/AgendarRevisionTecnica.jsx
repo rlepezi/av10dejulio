@@ -57,9 +57,46 @@ const AgendarRevisionTecnica = () => {
       // Inicializar centros de revisión técnica si no existen
       await initializeCentrosRevision();
       
-      // Cargar centros de revisión técnica
+      // Cargar centros de revisión técnica (centros administrados)
       const centrosSnapshot = await getDocs(collection(db, 'centros_revision'));
-      setCentrosRevision(centrosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const centrosData = centrosSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        tipo: 'centro_admin' // Marcar como centro administrado
+      }));
+
+      // Cargar empresas de revisión técnica (empresas creadas por admin)
+      const empresasQuery = query(
+        collection(db, 'empresas'),
+        where('tipoServicio', '==', 'revision_tecnica'),
+        where('estado', 'in', ['activa', 'validada', 'ingresada'])
+      );
+      const empresasSnapshot = await getDocs(empresasQuery);
+      const empresasData = empresasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        tipo: 'empresa_revision', // Marcar como empresa de revisión
+        // Mapear campos para compatibilidad
+        nombre: doc.data().nombre,
+        direccion: doc.data().direccion,
+        comuna: doc.data().comuna,
+        region: doc.data().region,
+        telefono: doc.data().telefono,
+        email: doc.data().email,
+        paginaWeb: doc.data().sitio_web || doc.data().web,
+        horario: doc.data().horario_atencion || 'Consultar horarios',
+        logo: doc.data().logo_url || doc.data().logo
+      }));
+
+      // Combinar centros administrados y empresas de revisión
+      const todosLosCentros = [...centrosData, ...empresasData];
+      setCentrosRevision(todosLosCentros);
+
+      console.log('🏢 Centros de revisión cargados:', {
+        centros_admin: centrosData.length,
+        empresas_revision: empresasData.length,
+        total: todosLosCentros.length
+      });
 
       if (user) {
         // Cargar vehículos del usuario
@@ -285,8 +322,20 @@ const AgendarRevisionTecnica = () => {
                 {filteredCentros.map((centro) => (
                   <div key={centro.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{centro.nombre}</h4>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900">{centro.nombre}</h4>
+                          {centro.tipo === 'empresa_revision' && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                              🏢 Empresa
+                            </span>
+                          )}
+                          {centro.tipo === 'centro_admin' && (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                              🏛️ Centro Oficial
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600">{centro.comuna}, {centro.region}</p>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -309,8 +358,21 @@ const AgendarRevisionTecnica = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <span>🕒</span>
-                        <span>{centro.horarios}</span>
+                        <span>{centro.horarios || centro.horario}</span>
                       </div>
+                      {centro.paginaWeb && (
+                        <div className="flex items-center gap-2">
+                          <span>🌐</span>
+                          <a 
+                            href={centro.paginaWeb.startsWith('http') ? centro.paginaWeb : `https://${centro.paginaWeb}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            {centro.paginaWeb}
+                          </a>
+                        </div>
+                      )}
                       {centro.tiposVehiculo && (
                         <div className="flex items-center gap-2">
                           <span>🚗</span>

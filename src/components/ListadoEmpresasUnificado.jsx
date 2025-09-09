@@ -48,6 +48,7 @@ export default function ListadoEmpresasUnificado({
           contactoAdicional: data.contactoAdicional || {},
           comuna: data.comuna,
           region: data.region,
+          tipoServicio: data.tipoServicio || 'general', // Campo para identificar tipo de servicio
         };
       });
       setEmpresas(empresasData);
@@ -58,6 +59,12 @@ export default function ListadoEmpresasUnificado({
 
   // Filtros
   let empresasFiltradas = empresas;
+
+  // Excluir empresas de revisión técnica del listado general
+  empresasFiltradas = empresasFiltradas.filter(emp => 
+    emp.tipoServicio !== 'revision_tecnica' && 
+    !emp.categorias?.includes('Revisión Técnica')
+  );
 
   if (filtroTipo && filtroTipo !== 'todos') {
     empresasFiltradas = empresasFiltradas.filter(emp =>

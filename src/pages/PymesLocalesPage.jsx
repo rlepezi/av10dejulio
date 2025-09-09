@@ -123,6 +123,12 @@ const PymesLocalesPage = () => {
   };
 
   const isPymeOrEmprendimiento = (provider) => {
+    // Excluir empresas de revisión técnica de PyMEs
+    if (provider.tipoServicio === 'revision_tecnica' || 
+        provider.categorias?.includes('Revisión Técnica')) {
+      return false;
+    }
+    
     // Si existe tipoEmpresa, usarlo como filtro principal
     if (provider.tipoEmpresa) {
       // Mostrar todo EXCEPTO proveedores

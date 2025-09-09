@@ -330,6 +330,9 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
       console.log('🏷️ Categorías seleccionadas:', formData.categorias);
       console.log('🚗 Marcas seleccionadas:', formData.marcas);
 
+      // Determinar si es empresa de Revisión Técnica
+      const esRevisionTecnica = categoriasSeleccionadas.includes('Revisión Técnica');
+      
       const empresaData = {
         ...formData,
         estado: 'ingresada', // Estado inicial: ingresada
@@ -338,6 +341,8 @@ export default function CrearEmpresaPublica({ onClose, onSuccess }) {
         fecha_creacion: new Date(),
         fecha_actualizacion: new Date(),
         creado_por: 'admin',
+        // Campo especial para identificar empresas de revisión técnica
+        tipoServicio: esRevisionTecnica ? 'revision_tecnica' : 'general',
         // Mapear campos correctamente
         web: formData.sitio_web,
         categoria: categoriasSeleccionadas.join(', '), // Categoría como string para compatibilidad
