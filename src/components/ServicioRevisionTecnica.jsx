@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 
@@ -7,13 +7,16 @@ export default function ServicioRevisionTecnica() {
   const { user, rol } = useAuth();
   const [centrosRevision, setCentrosRevision] = useState([]);
   const [misRevisiones, setMisRevisiones] = useState([]);
+  const [todasLasRevisiones, setTodasLasRevisiones] = useState([]); // Para admin
   const [vehiculos, setVehiculos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('agendar');
   const [showModal, setShowModal] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [editingCentro, setEditingCentro] = useState(null);
+  const [editingRevision, setEditingRevision] = useState(null);
   const [adminForm, setAdminForm] = useState({
     nombre: '',
     region: '',
@@ -23,6 +26,27 @@ export default function ServicioRevisionTecnica() {
     horario: '',
     telefono: '',
     email: ''
+  });
+  const [revisionForm, setRevisionForm] = useState({
+    clienteId: '',
+    vehiculoId: '',
+    centroId: '',
+    fecha: '',
+    hora: '',
+    tipoRevision: 'revision_tecnica',
+    estado: 'pendiente',
+    observaciones: '',
+    contacto: {
+      telefono: '',
+      email: ''
+    }
+  });
+  const [filtrosRevision, setFiltrosRevision] = useState({
+    estado: '',
+    fechaDesde: '',
+    fechaHasta: '',
+    centro: '',
+    cliente: ''
   });
 
   useEffect(() => {
@@ -51,6 +75,16 @@ export default function ServicioRevisionTecnica() {
         );
         const vehiculosSnapshot = await getDocs(vehiculosQuery);
         setVehiculos(vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // Si es admin, cargar todas las revisiones técnicas
+        if (rol === 'admin') {
+          const todasRevisionesQuery = query(
+            collection(db, 'revisiones_tecnicas'),
+            orderBy('fechaCreacion', 'desc')
+          );
+          const todasRevisionesSnapshot = await getDocs(todasRevisionesQuery);
+          setTodasLasRevisiones(todasRevisionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -140,6 +174,86 @@ export default function ServicioRevisionTecnica() {
       } catch (error) {
         console.error('Error deleting center:', error);
       }
+    }
+  };
+
+  // Funciones para gestión de revisiones técnicas
+  const abrirModalRevision = (revision = null) => {
+    if (revision) {
+      setEditingRevision(revision);
+      setRevisionForm({
+        clienteId: revision.clienteId || revision.userId || '',
+        vehiculoId: revision.vehiculoId || '',
+        centroId: revision.centroId || '',
+        fecha: revision.fecha || '',
+        hora: revision.hora || '',
+        tipoRevision: revision.tipoRevision || 'revision_tecnica',
+        estado: revision.estado || 'pendiente',
+        observaciones: revision.observaciones || '',
+        contacto: revision.contacto || { telefono: '', email: '' }
+      });
+    } else {
+      setEditingRevision(null);
+      setRevisionForm({
+        clienteId: '',
+        vehiculoId: '',
+        centroId: '',
+        fecha: '',
+        hora: '',
+        tipoRevision: 'revision_tecnica',
+        estado: 'pendiente',
+        observaciones: '',
+        contacto: { telefono: '', email: '' }
+      });
+    }
+    setShowRevisionModal(true);
+  };
+
+  const guardarRevision = async (e) => {
+    e.preventDefault();
+    try {
+      const revisionData = {
+        ...revisionForm,
+        fechaCreacion: editingRevision ? editingRevision.fechaCreacion : new Date(),
+        fechaActualizacion: new Date(),
+        actualizadoPor: user.uid
+      };
+
+      if (editingRevision) {
+        await updateDoc(doc(db, 'revisiones_tecnicas', editingRevision.id), revisionData);
+      } else {
+        await addDoc(collection(db, 'revisiones_tecnicas'), revisionData);
+      }
+
+      await loadData();
+      setShowRevisionModal(false);
+      setEditingRevision(null);
+    } catch (error) {
+      console.error('Error saving revision:', error);
+    }
+  };
+
+  const eliminarRevision = async (revisionId) => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta revisión técnica?')) {
+      try {
+        await deleteDoc(doc(db, 'revisiones_tecnicas', revisionId));
+        await loadData();
+      } catch (error) {
+        console.error('Error deleting revision:', error);
+      }
+    }
+  };
+
+  const cambiarEstadoRevision = async (revisionId, nuevoEstado) => {
+    try {
+      await updateDoc(doc(db, 'revisiones_tecnicas', revisionId), {
+        estado: nuevoEstado,
+        fechaActualizacion: new Date(),
+        actualizadoPor: user.uid
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Error updating revision status:', error);
     }
   };
 
@@ -492,28 +606,57 @@ export default function ServicioRevisionTecnica() {
 
         {activeTab === 'admin' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Administración de Centros de Revisión Técnica</h3>
-              <button
-                onClick={() => {
-                  setEditingCentro(null);
-                  setAdminForm({
-                    nombre: '',
-                    region: '',
-                    comuna: '',
-                    direccion: '',
-                    paginaWeb: '',
-                    horario: '',
-                    telefono: '',
-                    email: ''
-                  });
-                  setShowAdminModal(true);
-                }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-              >
-                + Agregar Centro
-              </button>
+            {/* Sub-pestañas para administración */}
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('admin-centros')}
+                  className={`pb-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'admin-centros' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Centros de Revisión
+                </button>
+                <button
+                  onClick={() => setActiveTab('admin-revisiones')}
+                  className={`pb-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'admin-revisiones' 
+                      ? 'border-blue-500 text-blue-600' 
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Revisiones Técnicas
+                </button>
+              </nav>
             </div>
+
+            {/* Contenido de Centros de Revisión */}
+            {activeTab === 'admin-centros' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Administración de Centros de Revisión Técnica</h3>
+                  <button
+                    onClick={() => {
+                      setEditingCentro(null);
+                      setAdminForm({
+                        nombre: '',
+                        region: '',
+                        comuna: '',
+                        direccion: '',
+                        paginaWeb: '',
+                        horario: '',
+                        telefono: '',
+                        email: ''
+                      });
+                      setShowAdminModal(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  >
+                    + Agregar Centro
+                  </button>
+                </div>
 
             <div className="grid gap-4">
               {centrosRevision.filter(centro => centro.activo !== false).map(centro => (
@@ -564,6 +707,153 @@ export default function ServicioRevisionTecnica() {
                 </div>
               ))}
             </div>
+              </div>
+            )}
+
+            {/* Contenido de Revisiones Técnicas */}
+            {activeTab === 'admin-revisiones' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Gestión de Revisiones Técnicas</h3>
+                  <button
+                    onClick={() => abrirModalRevision()}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  >
+                    + Nueva Revisión
+                  </button>
+                </div>
+
+                {/* Filtros */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Estado</label>
+                      <select
+                        className="w-full border rounded px-3 py-2"
+                        value={filtrosRevision.estado}
+                        onChange={(e) => setFiltrosRevision(prev => ({ ...prev, estado: e.target.value }))}
+                      >
+                        <option value="">Todos los estados</option>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="confirmada">Confirmada</option>
+                        <option value="completada">Completada</option>
+                        <option value="cancelada">Cancelada</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Fecha Desde</label>
+                      <input
+                        type="date"
+                        className="w-full border rounded px-3 py-2"
+                        value={filtrosRevision.fechaDesde}
+                        onChange={(e) => setFiltrosRevision(prev => ({ ...prev, fechaDesde: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Fecha Hasta</label>
+                      <input
+                        type="date"
+                        className="w-full border rounded px-3 py-2"
+                        value={filtrosRevision.fechaHasta}
+                        onChange={(e) => setFiltrosRevision(prev => ({ ...prev, fechaHasta: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Centro</label>
+                      <select
+                        className="w-full border rounded px-3 py-2"
+                        value={filtrosRevision.centro}
+                        onChange={(e) => setFiltrosRevision(prev => ({ ...prev, centro: e.target.value }))}
+                      >
+                        <option value="">Todos los centros</option>
+                        {centrosRevision.map(centro => (
+                          <option key={centro.id} value={centro.id}>{centro.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de revisiones */}
+                <div className="space-y-4">
+                  {todasLasRevisiones
+                    .filter(revision => {
+                      if (filtrosRevision.estado && revision.estado !== filtrosRevision.estado) return false;
+                      if (filtrosRevision.centro && revision.centroId !== filtrosRevision.centro) return false;
+                      if (filtrosRevision.fechaDesde && new Date(revision.fecha) < new Date(filtrosRevision.fechaDesde)) return false;
+                      if (filtrosRevision.fechaHasta && new Date(revision.fecha) > new Date(filtrosRevision.fechaHasta)) return false;
+                      return true;
+                    })
+                    .map(revision => (
+                    <div key={revision.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-lg">Revisión #{revision.id.slice(-8)}</h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              revision.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                              revision.estado === 'confirmada' ? 'bg-blue-100 text-blue-800' :
+                              revision.estado === 'completada' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {revision.estado}
+                            </span>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-2 text-sm text-gray-600">
+                            <div>
+                              <span className="font-medium">📅 Fecha:</span>
+                              <p>{revision.fecha} {revision.hora}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium">🏢 Centro:</span>
+                              <p>{centrosRevision.find(c => c.id === revision.centroId)?.nombre || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium">👤 Cliente:</span>
+                              <p>{revision.clienteId || revision.userId || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="font-medium">🚗 Vehículo:</span>
+                              <p>{revision.vehiculoId || 'N/A'}</p>
+                            </div>
+                            {revision.observaciones && (
+                              <div className="md:col-span-2">
+                                <span className="font-medium">📝 Observaciones:</span>
+                                <p>{revision.observaciones}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => abrirModalRevision(revision)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                          >
+                            Editar
+                          </button>
+                          <select
+                            value={revision.estado}
+                            onChange={(e) => cambiarEstadoRevision(revision.id, e.target.value)}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="pendiente">Pendiente</option>
+                            <option value="confirmada">Confirmada</option>
+                            <option value="completada">Completada</option>
+                            <option value="cancelada">Cancelada</option>
+                          </select>
+                          <button
+                            onClick={() => eliminarRevision(revision.id)}
+                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -713,6 +1003,151 @@ export default function ServicioRevisionTecnica() {
                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
                 >
                   {editingCentro ? 'Actualizar' : 'Agregar'} Centro
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de gestión de revisiones técnicas */}
+      {showRevisionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingRevision ? 'Editar Revisión Técnica' : 'Nueva Revisión Técnica'}
+            </h3>
+            
+            <form onSubmit={guardarRevision} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">ID Cliente *</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.clienteId}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, clienteId: e.target.value }))}
+                    required
+                    placeholder="ID del cliente"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">ID Vehículo</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.vehiculoId}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, vehiculoId: e.target.value }))}
+                    placeholder="ID del vehículo"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Centro de Revisión *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.centroId}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, centroId: e.target.value }))}
+                    required
+                  >
+                    <option value="">Seleccionar centro</option>
+                    {centrosRevision.map(centro => (
+                      <option key={centro.id} value={centro.id}>{centro.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Estado *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.estado}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, estado: e.target.value }))}
+                    required
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="confirmada">Confirmada</option>
+                    <option value="completada">Completada</option>
+                    <option value="cancelada">Cancelada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Fecha *</label>
+                  <input
+                    type="date"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.fecha}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, fecha: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Hora *</label>
+                  <input
+                    type="time"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.hora}
+                    onChange={(e) => setRevisionForm(prev => ({ ...prev, hora: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Teléfono de Contacto</label>
+                  <input
+                    type="tel"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.contacto.telefono}
+                    onChange={(e) => setRevisionForm(prev => ({ 
+                      ...prev, 
+                      contacto: { ...prev.contacto, telefono: e.target.value }
+                    }))}
+                    placeholder="+56 9 1234 5678"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email de Contacto</label>
+                  <input
+                    type="email"
+                    className="w-full border rounded px-3 py-2"
+                    value={revisionForm.contacto.email}
+                    onChange={(e) => setRevisionForm(prev => ({ 
+                      ...prev, 
+                      contacto: { ...prev.contacto, email: e.target.value }
+                    }))}
+                    placeholder="cliente@email.com"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Observaciones</label>
+                <textarea
+                  className="w-full border rounded px-3 py-2"
+                  rows="3"
+                  value={revisionForm.observaciones}
+                  onChange={(e) => setRevisionForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                  placeholder="Observaciones adicionales sobre la revisión..."
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-50"
+                  onClick={() => setShowRevisionModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+                >
+                  {editingRevision ? 'Actualizar' : 'Crear'} Revisión
                 </button>
               </div>
             </form>
