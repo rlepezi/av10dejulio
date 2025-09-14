@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
+import { useNavigate } from 'react-router-dom';
 
 export default function ServicioRevisionTecnica() {
   const { user, rol } = useAuth();
+  const navigate = useNavigate();
   const [centrosRevision, setCentrosRevision] = useState([]);
   const [misRevisiones, setMisRevisiones] = useState([]);
   const [todasLasRevisiones, setTodasLasRevisiones] = useState([]); // Para admin
   const [vehiculos, setVehiculos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('agendar');
+  const [activeTab, setActiveTab] = useState(rol === 'admin' ? 'agendar' : 'agendar');
   const [showModal, setShowModal] = useState(false);
   const [selectedCentro, setSelectedCentro] = useState(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -55,9 +57,53 @@ export default function ServicioRevisionTecnica() {
 
   const loadData = async () => {
     try {
-      // Cargar centros de revisión técnica
+      // Cargar centros de revisión técnica (centros administrados)
       const centrosSnapshot = await getDocs(collection(db, 'centros_revision'));
-      setCentrosRevision(centrosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const centrosData = centrosSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        tipo: 'centro_admin',
+        disponibilidad: 'disponible' // SIEMPRE disponible para centros admin
+      }));
+
+      // Cargar empresas de revisión técnica (empresas creadas por admin)
+      const empresasQuery = query(
+        collection(db, 'empresas'),
+        where('tipoServicio', '==', 'revision_tecnica'),
+        where('estado', 'in', ['activa', 'validada', 'ingresada'])
+      );
+      const empresasSnapshot = await getDocs(empresasQuery);
+      const empresasData = empresasSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        tipo: 'empresa_revision',
+        disponibilidad: 'disponible',
+        // Mapear campos para compatibilidad
+        nombre: doc.data().nombre,
+        direccion: doc.data().direccion,
+        comuna: doc.data().comuna,
+        region: doc.data().region,
+        telefono: doc.data().telefono,
+        email: doc.data().email,
+        paginaWeb: doc.data().sitio_web || doc.data().web,
+        horarios: doc.data().horario_atencion || 'Consultar horarios',
+        logo: doc.data().logo_url || doc.data().logo,
+        precioBase: 30000, // Precio por defecto
+        rating: 4.5, // Rating por defecto
+        distancia: '2.5', // Distancia por defecto
+        tiempoPromedio: '45', // Tiempo por defecto
+        servicios: ['Revisión Técnica', 'Verificación de Gases', 'Control de Frenos']
+      }));
+
+      // Combinar centros administrados y empresas de revisión
+      const todosLosCentros = [...centrosData, ...empresasData];
+      setCentrosRevision(todosLosCentros);
+
+      console.log('🏢 Centros de revisión cargados:', {
+        centros_admin: centrosData.length,
+        empresas_revision: empresasData.length,
+        total: todosLosCentros.length
+      });
 
       if (user) {
         // Cargar revisiones del usuario
@@ -68,13 +114,91 @@ export default function ServicioRevisionTecnica() {
         const revisionesSnapshot = await getDocs(revisionesQuery);
         setMisRevisiones(revisionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-        // Cargar vehículos del usuario
+        // Cargar vehículos del usuario - buscar por clienteId (campo principal)
+        console.log('🔍 Iniciando consulta de vehículos para usuario:', user.uid);
+        console.log('🔍 Comparando con clienteId de ejemplo: FwxoUCj90lhztH62YAdjckYbRPg2');
+        console.log('🔍 ¿Coinciden los IDs?', user.uid === 'FwxoUCj90lhztH62YAdjckYbRPg2');
+        
         const vehiculosQuery = query(
           collection(db, 'vehiculos_usuario'),
-          where('userId', '==', user.uid)
+          where('clienteId', '==', user.uid)
         );
+        
+        console.log('🔍 Consulta creada:', vehiculosQuery);
+        
         const vehiculosSnapshot = await getDocs(vehiculosQuery);
-        setVehiculos(vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        console.log('🔍 Snapshot recibido:', {
+          size: vehiculosSnapshot.size,
+          empty: vehiculosSnapshot.empty,
+          docs: vehiculosSnapshot.docs.length
+        });
+        
+        const vehiculosData = vehiculosSnapshot.docs.map(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          console.log('🔍 Procesando vehículo:', data);
+          return data;
+        });
+        
+        setVehiculos(vehiculosData);
+        
+        console.log('🚗 Vehículos cargados para usuario:', {
+          userId: user.uid,
+          cantidad: vehiculosData.length,
+          vehiculos: vehiculosData,
+          query: 'clienteId == ' + user.uid,
+          snapshotSize: vehiculosSnapshot.size,
+          snapshotEmpty: vehiculosSnapshot.empty
+        });
+        
+        // Log adicional para verificar la estructura de los vehículos
+        if (vehiculosData.length > 0) {
+          console.log('🔍 Primer vehículo encontrado:', vehiculosData[0]);
+          console.log('🔍 Campos del vehículo:', Object.keys(vehiculosData[0]));
+        } else {
+          console.log('⚠️ No se encontraron vehículos para el usuario:', user.uid);
+          console.log('⚠️ Verificando si hay vehículos con userId en lugar de clienteId...');
+          
+          // Intentar también con userId por si acaso
+          const vehiculosQueryUserId = query(
+            collection(db, 'vehiculos_usuario'),
+            where('userId', '==', user.uid)
+          );
+          const vehiculosSnapshotUserId = await getDocs(vehiculosQueryUserId);
+          console.log('🔍 Consulta con userId:', {
+            size: vehiculosSnapshotUserId.size,
+            empty: vehiculosSnapshotUserId.empty,
+            docs: vehiculosSnapshotUserId.docs.length
+          });
+          
+          // También intentar con el clienteId específico que sabemos que existe
+          console.log('⚠️ Intentando con el clienteId específico que sabemos que existe...');
+          const vehiculosQueryEspecifico = query(
+            collection(db, 'vehiculos_usuario'),
+            where('clienteId', '==', 'FwxoUCj90lhztH62YAdjckYbRPg2')
+          );
+          const vehiculosSnapshotEspecifico = await getDocs(vehiculosQueryEspecifico);
+          console.log('🔍 Consulta con clienteId específico:', {
+            size: vehiculosSnapshotEspecifico.size,
+            empty: vehiculosSnapshotEspecifico.empty,
+            docs: vehiculosSnapshotEspecifico.docs.length
+          });
+          
+          if (vehiculosSnapshotEspecifico.size > 0) {
+            console.log('🔍 ¡Encontrados vehículos con el clienteId específico!');
+            const vehiculosEspecificos = vehiculosSnapshotEspecifico.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log('🔍 Vehículos encontrados:', vehiculosEspecificos);
+            setVehiculos(vehiculosEspecificos);
+          } else {
+            // Si aún no encuentra vehículos, intentar cargar todos los vehículos para debug
+            console.log('🔍 No se encontraron vehículos, cargando todos para debug...');
+            const todosVehiculosQuery = query(collection(db, 'vehiculos_usuario'));
+            const todosVehiculosSnapshot = await getDocs(todosVehiculosQuery);
+            console.log('🔍 Todos los vehículos en la BD:', {
+              total: todosVehiculosSnapshot.size,
+              vehiculos: todosVehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            });
+          }
+        }
 
         // Si es admin, cargar todas las revisiones técnicas
         if (rol === 'admin') {
@@ -389,11 +513,28 @@ export default function ServicioRevisionTecnica() {
             <div>
               <h3 className="text-lg font-semibold mb-4">Centros de Revisión Técnica</h3>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {centrosRevision.map(centro => (
+                {centrosRevision.map(centro => {
+                  console.log('🎨 Renderizando centro en ServicioRevisionTecnica:', {
+                    nombre: centro.nombre,
+                    disponibilidad: centro.disponibilidad,
+                    tipo: centro.tipo,
+                    esDisponible: centro.disponibilidad === 'disponible'
+                  });
+                  
+                  return (
                   <div key={centro.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold">{centro.nombre}</h4>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold">{centro.nombre}</h4>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            centro.disponibilidad === 'disponible' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {centro.disponibilidad === 'disponible' ? 'Disponible' : 'No disponible'}
+                          </span>
+                        </div>
                         <p className="text-sm text-gray-600">{centro.direccion}</p>
                         <p className="text-sm text-gray-600">{centro.comuna}, {centro.region}</p>
                       </div>
@@ -432,6 +573,12 @@ export default function ServicioRevisionTecnica() {
                     <button
                       className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
                       onClick={() => {
+                        console.log('🖱️ Click en Agendar Cita para:', centro.nombre, 'disponibilidad:', centro.disponibilidad);
+                        console.log('🚗 Vehículos disponibles al abrir modal:', {
+                          cantidad: vehiculos.length,
+                          vehiculos: vehiculos,
+                          estado: vehiculos.length > 0 ? 'CON VEHÍCULOS' : 'SIN VEHÍCULOS'
+                        });
                         setSelectedCentro(centro);
                         setShowModal(true);
                       }}
@@ -439,7 +586,8 @@ export default function ServicioRevisionTecnica() {
                       Agendar Cita
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1157,12 +1305,21 @@ export default function ServicioRevisionTecnica() {
 
       {/* Modal de agendamiento */}
       {showModal && selectedCentro && (
-        <AgendamientoModal
-          centro={selectedCentro}
-          vehiculos={vehiculos}
-          onClose={() => setShowModal(false)}
-          onSubmit={agendarRevision}
-        />
+        <>
+          {console.log('🚀 Renderizando modal con vehículos:', {
+            showModal,
+            selectedCentro: selectedCentro?.nombre,
+            vehiculos: vehiculos,
+            cantidad: vehiculos?.length || 0,
+            estado: vehiculos?.length > 0 ? 'CON VEHÍCULOS' : 'SIN VEHÍCULOS'
+          })}
+          <AgendamientoModal
+            centro={selectedCentro}
+            vehiculos={vehiculos}
+            onClose={() => setShowModal(false)}
+            onSubmit={agendarRevision}
+          />
+        </>
       )}
     </div>
   );
@@ -1170,12 +1327,32 @@ export default function ServicioRevisionTecnica() {
 
 // Modal component para agendamiento
 function AgendamientoModal({ centro, vehiculos, onClose, onSubmit }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     vehiculoId: '',
     fecha: '',
     hora: '',
     tipo: 'anual',
     precio: centro.precioBase || 25000
+  });
+
+  // Log para depuración
+  console.log('🔍 AgendamientoModal - Vehículos recibidos:', {
+    cantidad: vehiculos?.length || 0,
+    vehiculos: vehiculos,
+    centro: centro?.nombre,
+    esArray: Array.isArray(vehiculos),
+    tipo: typeof vehiculos,
+    esUndefined: vehiculos === undefined,
+    esNull: vehiculos === null
+  });
+  
+  // Log adicional para verificar la condición del dropdown
+  console.log('🔍 Condición del dropdown:', {
+    vehiculosExiste: !!vehiculos,
+    vehiculosLength: vehiculos?.length,
+    condicion: vehiculos && vehiculos.length > 0,
+    mostrarDropdown: vehiculos && vehiculos.length > 0 ? 'SÍ' : 'NO'
   });
 
   const [horasDisponibles] = useState([
@@ -1209,19 +1386,36 @@ function AgendamientoModal({ centro, vehiculos, onClose, onSubmit }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Vehículo</label>
-            <select
-              className="w-full border rounded px-3 py-2"
-              value={formData.vehiculoId}
-              onChange={(e) => setFormData(prev => ({ ...prev, vehiculoId: e.target.value }))}
-              required
-            >
-              <option value="">Seleccionar vehículo</option>
-              {vehiculos.map(vehiculo => (
-                <option key={vehiculo.id} value={vehiculo.id}>
-                  {vehiculo.marca} {vehiculo.modelo} - {vehiculo.patente}
-                </option>
-              ))}
-            </select>
+            {vehiculos && vehiculos.length > 0 ? (
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={formData.vehiculoId}
+                onChange={(e) => setFormData(prev => ({ ...prev, vehiculoId: e.target.value }))}
+                required
+              >
+                <option value="">Seleccionar vehículo</option>
+                {vehiculos.map(vehiculo => {
+                  console.log('🚗 Renderizando vehículo en dropdown:', vehiculo);
+                  return (
+                    <option key={vehiculo.id} value={vehiculo.id}>
+                      {vehiculo.marca} {vehiculo.modelo} - {vehiculo.patente}
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <div className="w-full border rounded px-3 py-2 bg-gray-100 text-gray-500">
+                <p className="text-sm">No tienes vehículos registrados.</p>
+                <p className="text-xs mt-1">
+                  <button 
+                    onClick={() => window.location.href = '/vehiculos/agregar'}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Agregar vehículo
+                  </button>
+                </p>
+              </div>
+            )}
           </div>
           
           <div>

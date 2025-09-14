@@ -16,10 +16,17 @@ export default function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log("🔍 AuthProvider - Iniciando listener de autenticación");
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
+        console.log("🔍 AuthProvider - onAuthStateChanged ejecutado:", {
+          firebaseUser: firebaseUser,
+          email: firebaseUser?.email,
+          uid: firebaseUser?.uid
+        });
+        
         if (firebaseUser) {
-          console.log("Usuario logueado:", firebaseUser.email, "UID:", firebaseUser.uid);
+          console.log("✅ Usuario logueado:", firebaseUser.email, "UID:", firebaseUser.uid);
           
           // Buscar en la colección usuarios por UID
           let docSnap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
@@ -52,19 +59,27 @@ export default function AuthProvider({ children }) {
           }
           setUser(firebaseUser);
         } else {
-          console.log("Usuario no logueado");
+          console.log("❌ Usuario no logueado");
           setUser(null);
           setRol(null);
         }
       } catch (err) {
-        console.error("Error en AuthProvider:", err);
+        console.error("❌ Error en AuthProvider:", err);
         setError(err.message);
       } finally {
+        console.log("🔍 AuthProvider - Finalizando carga, setting loading to false");
         setLoading(false);
       }
     });
     return unsub;
   }, []);
+
+  console.log("🔍 AuthProvider - Renderizando con estado:", {
+    user: user,
+    rol: rol,
+    loading: loading,
+    error: error
+  });
 
   return (
     <AuthContext.Provider value={{ user, rol, loading, error }}>

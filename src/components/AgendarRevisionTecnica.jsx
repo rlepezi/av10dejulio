@@ -54,16 +54,39 @@ const AgendarRevisionTecnica = () => {
 
   const loadData = async () => {
     try {
+      console.log('🔄 Iniciando carga de datos...');
+      console.log('👤 Usuario:', user?.uid, 'Rol:', rol);
+      
       // Inicializar centros de revisión técnica si no existen
-      await initializeCentrosRevision();
+      try {
+        await initializeCentrosRevision();
+        console.log('✅ Centros de revisión inicializados');
+      } catch (initError) {
+        console.warn('⚠️ Error inicializando centros (continuando):', initError);
+      }
       
       // Cargar centros de revisión técnica (centros administrados)
       const centrosSnapshot = await getDocs(collection(db, 'centros_revision'));
-      const centrosData = centrosSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        tipo: 'centro_admin' // Marcar como centro administrado
-      }));
+      console.log('📊 Documentos en centros_revision:', centrosSnapshot.docs.length);
+      
+      const centrosData = centrosSnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('📋 Centro cargado:', {
+          id: doc.id,
+          nombre: data.nombre,
+          disponibilidad: data.disponibilidad,
+          activo: data.activo
+        });
+        
+        return { 
+          id: doc.id, 
+          ...data,
+          tipo: 'centro_admin', // Marcar como centro administrado
+          disponibilidad: data.disponibilidad || 'disponible', // Disponible por defecto
+          activo: data.activo !== false // Activo por defecto si no está definido
+        };
+      });
+      console.log('🏛️ Centros administrados cargados:', centrosData.length);
 
       // Cargar empresas de revisión técnica (empresas creadas por admin)
       const empresasQuery = query(
@@ -76,6 +99,8 @@ const AgendarRevisionTecnica = () => {
         id: doc.id,
         ...doc.data(),
         tipo: 'empresa_revision', // Marcar como empresa de revisión
+        disponibilidad: 'disponible', // Las empresas de revisión están disponibles por defecto
+        activo: true, // Las empresas activas están disponibles
         // Mapear campos para compatibilidad
         nombre: doc.data().nombre,
         direccion: doc.data().direccion,
@@ -87,6 +112,7 @@ const AgendarRevisionTecnica = () => {
         horario: doc.data().horario_atencion || 'Consultar horarios',
         logo: doc.data().logo_url || doc.data().logo
       }));
+      console.log('🏢 Empresas de revisión cargadas:', empresasData.length);
 
       // Combinar centros administrados y empresas de revisión
       const todosLosCentros = [...centrosData, ...empresasData];
@@ -95,17 +121,28 @@ const AgendarRevisionTecnica = () => {
       console.log('🏢 Centros de revisión cargados:', {
         centros_admin: centrosData.length,
         empresas_revision: empresasData.length,
-        total: todosLosCentros.length
+        total: todosLosCentros.length,
+        centros: todosLosCentros.map(c => ({
+          id: c.id,
+          nombre: c.nombre,
+          disponibilidad: c.disponibilidad,
+          activo: c.activo,
+          tipo: c.tipo
+        }))
       });
 
       if (user) {
+        console.log('👤 Cargando datos del usuario...');
+        
         // Cargar vehículos del usuario
         const vehiculosQuery = query(
           collection(db, 'vehiculos'),
           where('clienteId', '==', user.uid)
         );
         const vehiculosSnapshot = await getDocs(vehiculosQuery);
-        setVehiculos(vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const vehiculosData = vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setVehiculos(vehiculosData);
+        console.log('🚗 Vehículos cargados:', vehiculosData.length);
 
         // Cargar revisiones del usuario
         const revisionesQuery = query(
@@ -114,12 +151,15 @@ const AgendarRevisionTecnica = () => {
           orderBy('fechaCreacion', 'desc')
         );
         const revisionesSnapshot = await getDocs(revisionesQuery);
-        setMisRevisiones(revisionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const revisionesData = revisionesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMisRevisiones(revisionesData);
+        console.log('📅 Revisiones cargadas:', revisionesData.length);
       }
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading data:', error);
     } finally {
       setLoading(false);
+      console.log('✅ Carga de datos completada');
     }
   };
 
@@ -167,21 +207,39 @@ const AgendarRevisionTecnica = () => {
     }
   };
 
+  console.log('🔧 Estado de filtros:', filtros);
+  console.log('📊 Total centros antes de filtrar:', centrosRevision.length);
+  
   const filteredCentros = centrosRevision.filter(centro => {
+    console.log('🔍 Filtrando centro:', {
+      nombre: centro.nombre,
+      disponibilidad: centro.disponibilidad,
+      activo: centro.activo,
+      tipo: centro.tipo,
+      filtroDisponibilidad: filtros.disponibilidad
+    });
+    
     if (filtros.comuna && !centro.comuna?.toLowerCase().includes(filtros.comuna.toLowerCase())) {
+      console.log('❌ Filtrado por comuna:', centro.nombre);
       return false;
     }
     if (filtros.tipoVehiculo && !centro.tiposVehiculo?.includes(filtros.tipoVehiculo)) {
+      console.log('❌ Filtrado por tipo vehículo:', centro.nombre);
       return false;
     }
     if (filtros.horario && !centro.horarios?.includes(filtros.horario)) {
+      console.log('❌ Filtrado por horario:', centro.nombre);
       return false;
     }
     if (filtros.disponibilidad === 'disponible' && centro.disponibilidad === 'no_disponible') {
+      console.log('❌ Filtrado por disponibilidad:', centro.nombre, 'disponibilidad:', centro.disponibilidad);
       return false;
     }
+    console.log('✅ Centro pasa filtros:', centro.nombre);
     return true;
   });
+  
+  console.log('📈 Centros después de filtrar:', filteredCentros.length);
 
   const formatDate = (fecha) => {
     if (!fecha) return '';
@@ -308,18 +366,56 @@ const AgendarRevisionTecnica = () => {
 
             {filteredCentros.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">🔍</div>
-                <p>No se encontraron centros que coincidan con los filtros</p>
-                <button
-                  onClick={() => setFiltros({comuna: '', tipoVehiculo: '', horario: '', disponibilidad: 'disponible'})}
-                  className="mt-2 text-blue-600 hover:text-blue-800"
-                >
-                  Limpiar filtros
-                </button>
+                {centrosRevision.length === 0 ? (
+                  <>
+                    <div className="text-4xl mb-2">🏢</div>
+                    <p className="text-lg font-medium mb-2">No hay centros de revisión técnica disponibles</p>
+                    <p className="text-sm mb-4">Los administradores deben agregar centros de revisión técnica primero</p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
+                      <p className="text-sm text-yellow-800 mb-3">
+                        💡 <strong>Para administradores:</strong> Ve a la sección de administración para agregar centros de revisión técnica.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          try {
+                            console.log('🔄 Forzando inicialización de centros...');
+                            await initializeCentrosRevision();
+                            await loadData();
+                            console.log('✅ Centros inicializados y recargados');
+                          } catch (error) {
+                            console.error('❌ Error inicializando centros:', error);
+                          }
+                        }}
+                        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                      >
+                        🔄 Inicializar Centros de Prueba
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-4xl mb-2">🔍</div>
+                    <p>No se encontraron centros que coincidan con los filtros</p>
+                    <button
+                      onClick={() => setFiltros({comuna: '', tipoVehiculo: '', horario: '', disponibilidad: 'disponible'})}
+                      className="mt-2 text-blue-600 hover:text-blue-800"
+                    >
+                      Limpiar filtros
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredCentros.map((centro) => (
+                {filteredCentros.map((centro) => {
+                  console.log('🎨 Renderizando centro:', {
+                    nombre: centro.nombre,
+                    disponibilidad: centro.disponibilidad,
+                    tipo: centro.tipo,
+                    activo: centro.activo
+                  });
+                  
+                  return (
                   <div key={centro.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
@@ -343,7 +439,7 @@ const AgendarRevisionTecnica = () => {
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {centro.disponibilidad === 'disponible' ? 'Disponible' : 'No disponible'}
+                        {centro.disponibilidad === 'disponible' ? 'Disponible' : `No disponible (${centro.disponibilidad || 'undefined'})`}
                       </span>
                     </div>
 
@@ -384,6 +480,7 @@ const AgendarRevisionTecnica = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
+                          console.log('🎯 Botón Agendar Cita clickeado para:', centro.nombre, 'disponibilidad:', centro.disponibilidad);
                           setSelectedCentro(centro);
                           setFormData({...formData, centroId: centro.id});
                           setShowModal(true);
@@ -394,6 +491,7 @@ const AgendarRevisionTecnica = () => {
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
+                        title={`Disponibilidad: ${centro.disponibilidad || 'undefined'}`}
                       >
                         Agendar Cita
                       </button>
@@ -405,7 +503,8 @@ const AgendarRevisionTecnica = () => {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

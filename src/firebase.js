@@ -38,9 +38,13 @@ let messaging = null;
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   try {
     messaging = getMessaging(app);
+    console.log('Firebase Messaging inicializado correctamente');
   } catch (error) {
     console.warn('Firebase Messaging no disponible:', error.message);
+    // No lanzar el error para evitar que falle la aplicación
   }
+} else {
+  console.warn('Firebase Messaging no disponible: Service Worker no soportado');
 }
 
 export { messaging };

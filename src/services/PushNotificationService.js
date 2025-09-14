@@ -27,29 +27,55 @@ class PushNotificationService {
 
     try {
       // Registrar Service Worker
-      await this.registerServiceWorker();
+      const registration = await this.registerServiceWorker();
       
-      // Inicializar Firebase Messaging
-      if (typeof window !== 'undefined') {
-        this.messaging = getMessaging();
-        this.setupMessageHandling();
+      // Solo inicializar Firebase Messaging si el service worker se registró correctamente
+      if (registration && typeof window !== 'undefined') {
+        try {
+          this.messaging = getMessaging();
+          this.setupMessageHandling();
+          console.log('Push notifications inicializadas correctamente');
+        } catch (messagingError) {
+          console.warn('Error inicializando Firebase Messaging:', messagingError);
+        }
+      } else {
+        console.warn('No se pudo registrar el Service Worker, notificaciones deshabilitadas');
       }
     } catch (error) {
       console.error('Error inicializando notificaciones:', error);
+      // No lanzar el error para evitar que falle la aplicación
     }
   }
 
   async registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        // Verificar si ya hay un service worker registrado
+        const existingRegistration = await navigator.serviceWorker.getRegistration();
+        if (existingRegistration) {
+          console.log('Service Worker ya registrado:', existingRegistration);
+          return existingRegistration;
+        }
+
+        // Registrar el service worker con manejo de errores mejorado
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/',
+          updateViaCache: 'none'
+        });
+        
         console.log('Firebase Service Worker registrado:', registration);
+        
+        // Esperar a que el service worker esté listo
+        await navigator.serviceWorker.ready;
+        
         return registration;
       } catch (error) {
         console.error('Error registrando Firebase Service Worker:', error);
-        throw error;
+        // No lanzar el error para evitar que falle toda la inicialización
+        return null;
       }
     }
+    return null;
   }
 
   async requestPermission() {

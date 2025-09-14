@@ -43,12 +43,34 @@ export default function GestionVehiculos() {
 
   const loadVehiculos = async () => {
     try {
-      const vehiculosQuery = query(
+      // Cargar vehículos del usuario - buscar por userId y clienteId
+      const vehiculosQueryUserId = query(
         collection(db, 'vehiculos_usuario'),
         where('userId', '==', user.uid)
       );
-      const vehiculosSnapshot = await getDocs(vehiculosQuery);
-      setVehiculos(vehiculosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const vehiculosQueryClienteId = query(
+        collection(db, 'vehiculos_usuario'),
+        where('clienteId', '==', user.uid)
+      );
+      
+      const [vehiculosSnapshotUserId, vehiculosSnapshotClienteId] = await Promise.all([
+        getDocs(vehiculosQueryUserId),
+        getDocs(vehiculosQueryClienteId)
+      ]);
+      
+      // Combinar resultados de ambas consultas
+      const vehiculosUserId = vehiculosSnapshotUserId.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const vehiculosClienteId = vehiculosSnapshotClienteId.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Eliminar duplicados basándose en el ID del documento
+      const vehiculosUnicos = [...vehiculosUserId];
+      vehiculosClienteId.forEach(vehiculo => {
+        if (!vehiculosUnicos.find(v => v.id === vehiculo.id)) {
+          vehiculosUnicos.push(vehiculo);
+        }
+      });
+      
+      setVehiculos(vehiculosUnicos);
     } catch (error) {
       console.error('Error loading vehiculos:', error);
     } finally {

@@ -16,7 +16,15 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache abierto');
-        return cache.addAll(urlsToCache);
+        // Intentar agregar URLs una por una para mejor manejo de errores
+        return Promise.allSettled(
+          urlsToCache.map(url => 
+            cache.add(url).catch(err => {
+              console.warn(`No se pudo cachear ${url}:`, err);
+              return null;
+            })
+          )
+        );
       })
       .catch(error => {
         console.error('Error instalando Service Worker:', error);
@@ -168,11 +176,16 @@ self.addEventListener('fetch', event => {
             // Si el fetch es exitoso, cachear la respuesta
             if (fetchResponse && fetchResponse.status === 200) {
               const responseToCache = fetchResponse.clone();
-              caches.open('av10dejulio-cache-v1')
+              caches.open(CACHE_NAME)
                 .then(cache => {
-                  cache.put(event.request, responseToCache);
+                  // Verificar que la respuesta es cacheable
+                  if (responseToCache.status === 200 && responseToCache.type === 'basic') {
+                    cache.put(event.request, responseToCache).catch(err => {
+                      console.log('Error cacheando respuesta:', err);
+                    });
+                  }
                 })
-                .catch(err => console.log('Error cacheando:', err));
+                .catch(err => console.log('Error abriendo cache:', err));
             }
             return fetchResponse;
           })

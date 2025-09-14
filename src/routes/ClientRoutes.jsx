@@ -9,6 +9,7 @@ import ClientValidationStatus from '../components/ClientValidationStatus';
 import GestionVehiculos from '../components/GestionVehiculos';
 import ServiciosVehiculo from '../components/ServiciosVehiculo';
 import EditarVehiculo from '../components/EditarVehiculo';
+import ServicioRevisionTecnica from '../components/ServicioRevisionTecnica';
 
 const ClientRoutes = () => {
   return (
@@ -61,6 +62,26 @@ const ClientRoutes = () => {
         element={
           <ProtectedClientRoute>
             <EditarVehiculo />
+          </ProtectedClientRoute>
+        }
+      />
+      
+      {/* Servicios */}
+      <Route
+        path="/servicios/revision-tecnica"
+        element={
+          <ProtectedClientRoute>
+            <ServicioRevisionTecnica />
+          </ProtectedClientRoute>
+        }
+      />
+      
+      {/* Ruta específica para dashboard cliente */}
+      <Route
+        path="/dashboard/cliente/revision-tecnica"
+        element={
+          <ProtectedClientRoute>
+            <ServicioRevisionTecnica />
           </ProtectedClientRoute>
         }
       />

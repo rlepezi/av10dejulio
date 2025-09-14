@@ -5,19 +5,46 @@ import { useAuth } from './AuthProvider';
 import { useNavigate } from 'react-router-dom';
 
 export default function ClientValidationStatus() {
-  const { user } = useAuth();
+  const { user, rol } = useAuth();
   const navigate = useNavigate();
   const [perfilCliente, setPerfilCliente] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  console.log('🔍 ClientValidationStatus - Componente renderizado:', {
+    user: user,
+    userUid: user?.uid,
+    userEmail: user?.email,
+    rol: rol,
+    loading: loading,
+    perfilCliente: perfilCliente
+  });
+
   useEffect(() => {
+    console.log('🔍 ClientValidationStatus - useEffect ejecutado:', {
+      user: user,
+      userUid: user?.uid,
+      loading: loading
+    });
+    
     if (user) {
+      console.log('✅ Usuario encontrado, iniciando búsqueda de perfil');
       checkClientProfile();
+    } else {
+      console.log('⚠️ No hay usuario autenticado, esperando...');
+      // Esperar un poco más antes de mostrar el estado de "no usuario"
+      const timeout = setTimeout(() => {
+        console.log('⏰ Timeout alcanzado, no hay usuario autenticado');
+        setLoading(false);
+      }, 3000);
+      
+      return () => clearTimeout(timeout);
     }
   }, [user]);
 
   const checkClientProfile = async () => {
     try {
+      console.log('🔍 Iniciando búsqueda de perfil para usuario:', user.uid);
+      
       // Buscar primero por userId (nuevo formato)
       let perfilQuery = query(
         collection(db, 'perfiles_clientes'),
@@ -25,22 +52,39 @@ export default function ClientValidationStatus() {
       );
       let perfilSnapshot = await getDocs(perfilQuery);
       
+      console.log('🔍 Búsqueda por userId:', {
+        empty: perfilSnapshot.empty,
+        size: perfilSnapshot.size,
+        docs: perfilSnapshot.docs.length
+      });
+      
       // Si no se encuentra, buscar por uid (formato anterior)
       if (perfilSnapshot.empty) {
+        console.log('🔍 No se encontró por userId, buscando por uid...');
         perfilQuery = query(
           collection(db, 'perfiles_clientes'),
           where('uid', '==', user.uid)
         );
         perfilSnapshot = await getDocs(perfilQuery);
+        
+        console.log('🔍 Búsqueda por uid:', {
+          empty: perfilSnapshot.empty,
+          size: perfilSnapshot.size,
+          docs: perfilSnapshot.docs.length
+        });
       }
       
       if (!perfilSnapshot.empty) {
         const perfil = { id: perfilSnapshot.docs[0].id, ...perfilSnapshot.docs[0].data() };
+        console.log('✅ Perfil encontrado:', perfil);
         setPerfilCliente(perfil);
+      } else {
+        console.log('⚠️ No se encontró perfil para el usuario');
       }
     } catch (error) {
-      console.error('Error checking profile:', error);
+      console.error('❌ Error checking profile:', error);
     } finally {
+      console.log('🔍 Finalizando carga, setting loading to false');
       setLoading(false);
     }
   };
@@ -93,7 +137,15 @@ export default function ClientValidationStatus() {
     return messages[estado] || 'Estado desconocido';
   };
 
+  console.log('🔍 Renderizando ClientValidationStatus:', {
+    loading,
+    perfilCliente,
+    user,
+    userUid: user?.uid
+  });
+
   if (loading) {
+    console.log('🔍 Mostrando estado de carga');
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
@@ -107,6 +159,7 @@ export default function ClientValidationStatus() {
   }
 
   if (!perfilCliente) {
+    console.log('🔍 No hay perfil de cliente, mostrando pantalla de registro');
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
@@ -119,6 +172,17 @@ export default function ClientValidationStatus() {
               Para acceder a todos nuestros servicios automotrices, recordatorios personalizados 
               y gestión de vehículos, necesitas crear tu perfil de cliente.
             </p>
+            
+            {/* Información de debug */}
+            <div className="bg-gray-100 p-4 rounded mb-4 text-left text-sm">
+              <h3 className="font-semibold mb-2">🔍 Información de Debug:</h3>
+              <p><strong>Usuario:</strong> {user ? 'Sí' : 'No'}</p>
+              <p><strong>UID:</strong> {user?.uid || 'No disponible'}</p>
+              <p><strong>Email:</strong> {user?.email || 'No disponible'}</p>
+              <p><strong>Rol:</strong> {rol || 'No disponible'}</p>
+              <p><strong>Loading:</strong> {loading ? 'Sí' : 'No'}</p>
+            </div>
+            
             <button
               onClick={() => navigate('/registro-cliente')}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"

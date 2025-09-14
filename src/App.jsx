@@ -23,6 +23,7 @@ import RegistrarEmpresaValidada from "./pages/RegistrarEmpresaValidada";
 
 // Componentes para rutas públicas principales
 import RegistroCliente from "./components/RegistroCliente";
+import ClientValidationStatus from "./components/ClientValidationStatus";
 import RegistroAgente from "./components/RegistroAgente";
 import RegistroEmpresa from "./components/RegistroEmpresa";
 import SolicitudComunidad from "./components/SolicitudComunidad";
@@ -40,7 +41,7 @@ import DashboardReciclajeCliente from "./pages/DashboardReciclajeCliente";
 import DashboardReciclajeProveedor from "./pages/DashboardReciclajeProveedor";
 import RegistroEmpresaReciclaje from "./pages/RegistroEmpresaReciclaje";
 import RecordatoriosPage from "./pages/RecordatoriosPage";
-import RevisionTecnicaClientePage from "./pages/RevisionTecnicaClientePage";
+import RevisionTecnicaPage from "./pages/RevisionTecnicaPage";
 import ServiciosRevisionTecnicaPage from "./pages/ServiciosRevisionTecnicaPage";
 import MasInformacionProveedorPage from "./pages/MasInformacionProveedorPage";
 import PerfilEmpresaPublica from "./pages/PerfilEmpresaPublica";
@@ -206,6 +207,7 @@ function App() {
             
             {/* Rutas críticas para navegación desde HeroSection */}
             <Route path="/registro-cliente" element={<RegistroCliente />} />
+            <Route path="/status-cliente" element={<ClientValidationStatus />} />
             <Route path="/registro-empresa" element={<RegistroEmpresa />} />
             <Route path="/solicitud-comunidad" element={<SolicitudComunidad />} />
             {/* Páginas públicas de empresas */}
@@ -229,7 +231,7 @@ function App() {
         <Route path="/dashboard/reciclaje/proveedor" element={<DashboardReciclajeProveedor />} />
         <Route path="/registro/empresa/reciclaje" element={<RegistroEmpresaReciclaje />} />
             <Route path="/mis-recordatorios" element={<RecordatoriosPage />} />
-            <Route path="/dashboard/cliente/revision-tecnica" element={<RevisionTecnicaClientePage />} />
+            <Route path="/dashboard/cliente/revision-tecnica" element={<RevisionTecnicaPage />} />
             
             {/* Perfil público de empresa */}
             <Route path="/empresa/:id" element={<PerfilEmpresaPublica />} />
